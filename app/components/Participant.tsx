@@ -142,7 +142,7 @@ export const Participant = forwardRef<
 					{!isScreenShare && (
 						<div
 							className={cn(
-								'absolute inset-0 h-full w-full grid place-items-center'
+								'absolute inset-0 h-full w-full grid place-items-center bg-gray-200'
 							)}
 						>
 							<div className="h-[2em] w-[2em] grid place-items-center text-4xl md:text-6xl 2xl:text-8xl relative">
@@ -190,7 +190,7 @@ export const Participant = forwardRef<
 						)}
 						videoTrack={videoTrack}
 					/>
-					{!isScreenShare && (
+					{false && !isScreenShare && (
 						<HoverFade className="absolute inset-0 grid w-full h-full place-items-center">
 							<div className="flex gap-2 p-2 rounded bg-zinc-900/30">
 								{/* <Tooltip content={pinned ? 'Restore' : 'Maximize'}> */}
@@ -223,7 +223,7 @@ export const Participant = forwardRef<
 
 							{!user.tracks.audioEnabled && !user.tracks.audioUnavailable && (
 								<Tooltip content="Mic is turned off">
-									<div className="indication-shadow">
+									<div className="text-red-500 flex items-center gap-2">
 										<Icon type="micOff" />
 										<VisuallyHidden>Mic is muted</VisuallyHidden>
 									</div>
@@ -231,9 +231,9 @@ export const Participant = forwardRef<
 							)}
 							{user.tracks.audioUnavailable && (
 								<Tooltip content="Mic is unavailable. User cannot unmute.">
-									<div className="indication-shadow">
-										<Icon type="micOff" className="text-red-400" />
-										<VisuallyHidden>Mic is muted</VisuallyHidden>
+									<div className="text-red-500 flex items-center gap-2">
+										<Icon type="micOff" />
+										<span>Mic is unavailable</span>
 									</div>
 								</Tooltip>
 							)}
@@ -269,7 +269,7 @@ export const Participant = forwardRef<
 							<Tooltip content="Hand is raised">
 								<div className="relative">
 									<div className="relative">
-										<Icon className="indication-shadow" type="handRaised" />
+										<Icon className="text-orange-500" type="handRaised" />
 										<Icon
 											className="absolute top-0 left-0 text-orange-300 animate-ping"
 											type="handRaised"
@@ -283,7 +283,7 @@ export const Participant = forwardRef<
 					{(isSpeaking || user.raisedHand) && !isScreenShare && (
 						<div
 							className={cn(
-								'pointer-events-none absolute inset-0 h-full w-full border-4 border-orange-400',
+								'pointer-events-none absolute inset-0 h-full w-full border-4 border-gray-400',
 								!pinned && 'rounded-xl'
 							)}
 						></div>

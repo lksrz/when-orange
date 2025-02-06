@@ -15,12 +15,16 @@ export const RaiseHandButton: FC<RaiseHandButtonProps> = ({
 }) => (
 	<Tooltip content={raisedHand ? 'Lower hand' : 'Raise Hand'}>
 		<Button
-			displayType={raisedHand ? 'primary' : 'secondary'}
+			displayType={raisedHand ? 'orange' : 'secondary'}
 			onClick={(_e) => {
 				onClick && onClick()
 				if (!raisedHand) playSound('raiseHand')
 			}}
+			className="flex items-center gap-2 text-xs"
 		>
+			<span className="hidden lg:inline">
+				{raisedHand ? 'Lower hand' : 'Raise hand'}
+			</span>
 			<Icon type="handRaised" />
 		</Button>
 	</Tooltip>

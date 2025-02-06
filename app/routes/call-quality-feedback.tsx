@@ -33,7 +33,7 @@ export default function SetUsername() {
 	const [params] = useSearchParams()
 	const meetingId = params.get('meetingId')
 	return (
-		<div className="grid h-full gap-4 place-content-center">
+		<div className="min-h-screen grid gap-4 place-content-center">
 			{meetingId ? (
 				<>
 					<h1 className="text-3xl font-bold">Experience any issues?</h1>

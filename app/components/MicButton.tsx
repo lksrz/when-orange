@@ -60,10 +60,11 @@ export const MicButton: FC<
 						onClick && onClick(e)
 					}}
 					{...rest}
+					className="flex items-center gap-2 text-xs"
 				>
-					<VisuallyHidden>
-						{audioEnabled ? 'Turn mic off' : 'Turn mic on'}
-					</VisuallyHidden>
+					<span className="hidden md:inline">
+						{audioEnabled ? 'MUTE' : 'UNMUTE'}
+					</span>
 					<Icon type={audioEnabled ? 'micOn' : 'micOff'} />
 				</Button>
 			</Tooltip>

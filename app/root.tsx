@@ -13,6 +13,7 @@ import {
 	Scripts,
 	ScrollRestoration,
 	useLoaderData,
+	useLocation,
 } from '@remix-run/react'
 import { parse } from 'cookie'
 import type { FC, ReactNode } from 'react'
@@ -76,7 +77,7 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 
 export const meta: MetaFunction = () => [
 	{
-		title: 'Orange Meets',
+		title: 'WhenMeet.me Call',
 	},
 ]
 
@@ -118,39 +119,32 @@ export const links: LinksFunction = () => [
 const Document: FC<{ children?: ReactNode }> = ({ children }) => {
 	const fullscreenRef = useRef<HTMLBodyElement>(null)
 	const [fullscreenEnabled, toggleFullscreen] = useToggle(false)
+	const location = useLocation()
 	useFullscreen(fullscreenRef, fullscreenEnabled, {
 		onClose: () => toggleFullscreen(false),
 	})
 	return (
 		// some extensions add data attributes to the html
 		// element that React complains about.
-		<html className="h-full" lang="en" suppressHydrationWarning>
+		<html lang="en" suppressHydrationWarning>
 			<head>
 				<meta charSet="utf-8" />
 				<meta name="viewport" content="width=device-width, initial-scale=1" />
-				<meta name="apple-mobile-web-app-title" content="Orange Meets" />
-				<meta name="application-name" content="Orange Meets" />
+				<meta name="apple-mobile-web-app-title" content="WhenMeet.me Call" />
+				<meta name="application-name" content="WhenMeet.me Call" />
 				<meta name="msapplication-TileColor" content="#ffffff" />
 				<meta
 					name="theme-color"
 					content="#ffffff"
-					media="(prefers-color-scheme: light)"
-				/>
-				<meta
-					name="theme-color"
-					content="#232325"
-					media="(prefers-color-scheme: dark)"
 				/>
 				<Meta />
 				<Links />
 			</head>
 			<body
 				className={cn(
-					'h-full',
-					'bg-white',
-					'text-zinc-800',
-					'dark:bg-zinc-800',
-					'dark:text-zinc-200'
+					'bg-gray-100',
+					'min-h-screen',
+					'flex flex-col flex-grow'
 				)}
 				ref={fullscreenRef}
 				onDoubleClick={(e) => {
@@ -161,12 +155,14 @@ const Document: FC<{ children?: ReactNode }> = ({ children }) => {
 						toggleFullscreen()
 				}}
 			>
+				{!location.pathname.endsWith('/room') && <Header />}
 				{children}
 				<ScrollRestoration />
 				<div className="hidden" suppressHydrationWarning>
 					{/* Replaced in entry.server.ts */}
 					__CLIENT_ENV__
 				</div>
+				{!location.pathname.endsWith('/room') && <Footer />}
 				<Scripts />
 				<LiveReload />
 			</body>
@@ -205,3 +201,45 @@ export default function App() {
 		</Document>
 	)
 }
+
+export const Footer = () => {
+	return (
+		<footer className="bg-gray-50 border-t border-gray-200 py-4">
+			<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+				<div className="flex justify-between items-center">
+					<p className="text-sm text-gray-500">
+			© {new Date().getFullYear()} WhenMeet.me
+			</p>
+			<a href="https://whenmeet.me/privacy" className="text-sm text-gray-500 hover:text-gray-700">
+			Privacy Policy
+			</a>
+		</div>
+		</div>
+		</footer>
+	)
+}
+
+export const Header = () => {
+	return (
+	  <nav className="bg-white shadow-sm">
+		<div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+		  <div className="flex items-center justify-between h-16">
+			<div className="flex items-center gap-4">
+			  <div className="text-xl font-semibold hidden sm:block">
+				<a href="https://whenmeet.me/" className="no-underline">WhenMeet<span className="text-blue-500">?</span>me</a>
+			  </div>
+			  <div className="text-xl font-semibold sm:hidden">
+				<a href="https://whenmeet.me/" className="no-underline">WhenMeet<span className="text-blue-500">?</span>me</a>
+			  </div>
+				<button
+				  onClick={() => window.location.href = 'https://whenmeet.me/'}
+				  className="bg-blue-500 text-white px-3 sm:px-4 py-2 rounded hover:bg-blue-600 text-sm whitespace-nowrap"
+				>
+				  New Event
+				</button>
+			</div>
+		  </div>
+		</div>
+	  </nav>
+	)
+  } 

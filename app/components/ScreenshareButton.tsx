@@ -47,8 +47,9 @@ export const ScreenshareButton: FC<ScreenshareButtonProps> = () => {
 				displayType={sharing ? 'danger' : 'secondary'}
 				disabled={otherUserIsSharing}
 				onClick={sharing ? endScreenShare : startScreenShare}
+				className="flex items-center gap-2 text-xs"
 			>
-				<VisuallyHidden>Share screen</VisuallyHidden>
+				<span className="hidden lg:inline">{sharing ? 'Stop sharing' : 'Share screen'}</span>
 				<Icon type="screenshare" />
 			</Button>
 		</Tooltip>

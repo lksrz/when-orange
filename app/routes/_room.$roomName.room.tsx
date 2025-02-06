@@ -31,6 +31,7 @@ import useStageManager from '~/hooks/useStageManager'
 import { useUserJoinLeaveToasts } from '~/hooks/useUserJoinLeaveToasts'
 import getUsername from '~/utils/getUsername.server'
 import isNonNullable from '~/utils/isNonNullable'
+import invariant from 'tiny-invariant'
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 	const username = await getUsername(request)
@@ -53,7 +54,8 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 export default function Room() {
 	const { joined } = useRoomContext()
 	const navigate = useNavigate()
-	const { roomName } = useParams()
+	const { roomName } = useParams<{ roomName: string }>()
+	invariant(roomName, 'roomName is required')
 	const { mode, bugReportsEnabled } = useLoaderData<typeof loader>()
 	const [search] = useSearchParams()
 
@@ -66,12 +68,12 @@ export default function Room() {
 
 	return (
 		<Toast.Provider>
-			<JoinedRoom bugReportsEnabled={bugReportsEnabled} />
+			<JoinedRoom bugReportsEnabled={bugReportsEnabled} roomName={roomName} />
 		</Toast.Provider>
 	)
 }
 
-function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
+function JoinedRoom({ bugReportsEnabled, roomName }: { bugReportsEnabled: boolean, roomName: string }) {
 	const { hasDb, hasAiCredentials } = useLoaderData<typeof loader>()
 	const {
 		userMedia,
@@ -139,8 +141,8 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 		<PullAudioTracks
 			audioTracks={otherUsers.map((u) => u.tracks.audio).filter(isNonNullable)}
 		>
-			<div className="flex flex-col h-full bg-white dark:bg-zinc-800">
-				<div className="relative flex-grow bg-black isolate">
+			<div className="h-[100vh] flex flex-col bg-white">
+				<div className="relative flex-1 min-h-0">
 					<div
 						className="absolute inset-0 flex isolate gap-[var(--gap)] p-[var(--gap)]"
 						style={
@@ -160,7 +162,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 					</div>
 					<Toast.Viewport className="absolute bottom-0 right-0" />
 				</div>
-				<div className="flex flex-wrap items-center justify-center gap-2 p-2 text-sm md:gap-4 md:p-5 md:text-base">
+				<div className="flex gap-4 text-sm pt-0 p-4">
 					{hasAiCredentials && <AiButton recordActivity={recordActivity} />}
 					<MicButton warnWhenSpeakingWhileMuted />
 					<CameraButton />
@@ -169,16 +171,8 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 						raisedHand={raisedHand}
 						onClick={() => setRaisedHand(!raisedHand)}
 					/>
-					<ParticipantsButton
-						identity={identity}
-						otherUsers={otherUsers}
-						className="hidden md:block"
-					></ParticipantsButton>
 					<OverflowMenu bugReportsEnabled={bugReportsEnabled} />
-					<LeaveRoomButton
-						navigateToFeedbackPage={hasDb}
-						meetingId={meetingId}
-					/>
+					<LeaveRoomButton roomName={roomName} />
 					{showDebugInfo && meetingId && (
 						<CopyButton contentValue={meetingId}>Meeting Id</CopyButton>
 					)}

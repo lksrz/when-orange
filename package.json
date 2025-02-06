@@ -1,5 +1,5 @@
 {
-	"name": "orange-meets",
+	"name": "whenmeet-call",
 	"module": "worker.js",
 	"private": true,
 	"sideEffects": false,
@@ -12,7 +12,7 @@
 		"clean": "del public/build && del build",
 		"ci-test": "CI=true run-p typecheck test",
 		"remove-sourcemaps": "del public/build/**/*.map",
-		"deploy": "npm run ci-test && npm run build -- --sourcemap && npm run remove-sourcemaps && wrangler publish --define __RELEASE__:\\\"$(git rev-parse --short HEAD)\\\" --define __SENTRY_DSN__:\\\"$SENTRY_DSN\\\" ${WRANGLER_ARGS:-}",
+		"deploy": "npm run ci-test && npm run build -- --sourcemap && npm run remove-sourcemaps && wrangler deploy --define __RELEASE__:\\\"$(git rev-parse --short HEAD)\\\" --define __SENTRY_DSN__:\\\"$SENTRY_DSN\\\" ${WRANGLER_ARGS:-}",
 		"prettier": "prettier -w .",
 		"typecheck": "tsc --noEmit --skipLibCheck",
 		"typecheck:watch": "npm run typecheck -- --watch",
@@ -89,7 +89,7 @@
 		"tailwindcss": "^3.4.9",
 		"typescript": "^5.5.4",
 		"vitest": "1.5.0",
-		"wrangler": "^3.78.12"
+		"wrangler": "^3.107.2"
 	},
 	"overrides": {
 		"msw": {

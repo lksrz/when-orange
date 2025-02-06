@@ -6,28 +6,21 @@ import { Icon } from './Icon/Icon'
 import { Tooltip } from './Tooltip'
 
 interface LeaveRoomButtonProps {
-	navigateToFeedbackPage: boolean
-	meetingId?: string
+	roomName: string
 }
 
-export const LeaveRoomButton: FC<LeaveRoomButtonProps> = ({
-	navigateToFeedbackPage,
-	meetingId,
-}) => {
+export const LeaveRoomButton: FC<LeaveRoomButtonProps> = ({ roomName }) => {
 	const navigate = useNavigate()
 	return (
 		<Tooltip content="Leave">
 			<Button
 				displayType="danger"
 				onClick={() => {
-					const params = new URLSearchParams()
-					if (meetingId) params.set('meetingId', meetingId)
-					navigate(
-						navigateToFeedbackPage ? `/call-quality-feedback?${params}` : '/'
-					)
+					navigate(`/${roomName}?left=true`)
 				}}
+				className="flex items-center gap-2 text-xs"
 			>
-				<VisuallyHidden>Leave</VisuallyHidden>
+				<span className="hidden lg:inline">Leave</span>
 				<Icon type="phoneXMark" />
 			</Button>
 		</Tooltip>

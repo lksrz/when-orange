@@ -45,9 +45,9 @@ export const CopyButton = forwardRef<ElementRef<'button'>, CopyButtonProps>(
 				className="flex items-center gap-2 text-xs"
 				{...rest}
 			>
+				<span className="hidden md:inline">Copy link</span>
 				<Icon
 					type={copied ? 'ClipboardDocumentCheckIcon' : 'ClipboardDocumentIcon'}
-					className="text-xl"
 				/>
 				{copied ? copiedMessage : children}
 			</Button>

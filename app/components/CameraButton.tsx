@@ -50,10 +50,14 @@ export const CameraButton: FC<ButtonProps> = ({ onClick, ...rest }) => {
 					onClick && onClick(e)
 				}}
 				{...rest}
+				className="flex items-center gap-2 text-xs"
 			>
-				<VisuallyHidden>
-					{videoEnabled ? 'Turn camera off' : 'Turn camera on'}
-				</VisuallyHidden>
+				<span className="hidden md:inline lg:hidden">
+					{videoEnabled ? 'Cam off' : 'Cam on'}
+				</span>
+				<span className="hidden lg:inline">
+					{videoEnabled ? 'Disable camera' : 'Enable camera'}
+				</span>
 				<Icon type={videoEnabled ? 'videoOn' : 'videoOff'} />
 			</Button>
 		</Tooltip>

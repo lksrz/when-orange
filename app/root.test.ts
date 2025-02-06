@@ -40,7 +40,7 @@ describe('root loader', () => {
 			.map((s) => btoa(JSON.stringify(s)))
 			.join('.')}`
 
-		const url = new URL('https://orange.cloudflare.dev/')
+		const url = new URL('https://call.whenmeet.me/')
 
 		const request = new Request(url, {
 			headers: {
@@ -78,7 +78,7 @@ describe('root loader', () => {
 			.map((s) => btoa(JSON.stringify(s)))
 			.join('.')}`
 
-		const url = new URL('https://orange.cloudflare.dev/')
+		const url = new URL('https://call.whenmeet.me/')
 
 		const request = new Request(url, {
 			headers: {
@@ -108,7 +108,7 @@ describe('root loader', () => {
 			.map((s) => btoa(JSON.stringify(s)))
 			.join('.')}`
 
-		const request = new Request('https://orange.cloudflare.dev', {
+		const request = new Request('https://call.whenmeet.me', {
 			headers: {
 				Cookie,
 				'Sec-Fetch-User': '?1',
@@ -126,7 +126,7 @@ describe('root loader', () => {
 	})
 
 	it('should redirect to /set-username if CF_Authorization Cookie is missing', async () => {
-		const request = new Request('https://orange.cloudflare.dev', {})
+		const request = new Request('https://call.whenmeet.me', {})
 		let redirect = null
 		try {
 			const response = await loader({
@@ -149,7 +149,7 @@ describe('root loader', () => {
 
 		const [Cookie] = await commitSession(session).then((c) => c.split(';'))
 
-		const request = new Request('https://orange.cloudflare.dev', {
+		const request = new Request('https://call.whenmeet.me', {
 			headers: { Cookie: Cookie },
 		})
 		let redirect = null

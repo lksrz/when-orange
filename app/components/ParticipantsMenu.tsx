@@ -73,7 +73,8 @@ export const ParticipantsButton: FC<
 		<ParticipantsDialog {...rest}>
 			<Tooltip content={participantCount(otherUsers.length + 1)}>
 				<Trigger asChild>
-					<Button className={cn('relative', className)} displayType="secondary">
+					<Button className="flex items-center gap-2 text-xs" displayType="secondary">
+						<span className="hidden lg:inline">Participants</span>
 						<Icon type="userGroup" />
 					</Button>
 				</Trigger>

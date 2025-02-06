@@ -17,20 +17,30 @@ export async function setUsername(
 }
 
 /**
- * Utility for getting the username. In prod, this basically
- * just consists of getting the Cf-Access-Authenticated-User-Email
- * header, but in dev we allow manually setting this via the
- * username query param.
+ * Utility for getting the username. In production, this basically
+ * gets the Cf-Access-Authenticated-User-Email header.
+ * In development we allow manually setting this via the username query param.
  */
 export default async function getUsername(request: Request) {
-	const accessUsername = request.headers.get(
-		ACCESS_AUTHENTICATED_USER_EMAIL_HEADER
-	)
+	// First check if there's an access header
+	const accessUsername = request.headers.get(ACCESS_AUTHENTICATED_USER_EMAIL_HEADER)
 	if (accessUsername) return accessUsername
 
+	// Get the current session (if any)
 	const session = await getSession(request.headers.get('Cookie'))
 	const sessionUsername = session.get('username')
-	if (typeof sessionUsername === 'string') return sessionUsername
+
+	// Check if a username is provided via query parameter
+	const url = new URL(request.url)
+	const queryUsername = url.searchParams.get('username')
+	// If a username is provided and doesn't match the session (or there is no session),
+	// call setUsername which sets the cookie and redirects back to the cleaned URL
+	if (queryUsername && sessionUsername !== queryUsername) {
+		url.searchParams.delete('username')
+		return setUsername(queryUsername, request, url.toString())
+	}
+
+	if (sessionUsername) return sessionUsername
 
 	return null
 }

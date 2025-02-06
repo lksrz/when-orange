@@ -88,7 +88,7 @@ function RoomPreparation() {
 	return room.roomState.meetingId ? (
 		<Room room={room} userMedia={userMedia} />
 	) : (
-		<div className="grid place-items-center h-full">
+		<div className="grid place-items-center h-[100vh]">
 			<Spinner className="text-gray-500" />
 		</div>
 	)
