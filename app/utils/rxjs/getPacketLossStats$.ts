@@ -1,7 +1,6 @@
 import type { Observable } from 'rxjs'
 import { combineLatest, interval, map, pairwise, switchMap } from 'rxjs'
 import Ewma from '~/utils/ewma'
-import { mode } from '~/utils/mode'
 
 export interface PacketLossStats {
 	inboundPacketLossPercentage: number
@@ -39,15 +38,6 @@ export function getPacketLossStats$(
 				}
 				if (remoteCandidateID) {
 					remoteAddress = newStatsReport.get(remoteCandidateID).address
-				}
-				if (remoteAddress !== undefined && remoteAddress !== '141.101.90.0') {
-					console.warn(
-						"PeerConnection doesn't appear to be connected to anycast 141.101.90.0"
-					)
-					if (mode === 'production' && !anycastWarned) {
-						alert('You are not connected to CF anycast address')
-						anycastWarned = true
-					}
 				}
 
 				if (report.type === 'inbound-rtp') {
