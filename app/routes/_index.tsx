@@ -1,9 +1,8 @@
 import type { ActionFunction, LoaderFunctionArgs } from '@remix-run/cloudflare'
 import { json, redirect } from '@remix-run/cloudflare'
 import { Form, useLoaderData, useNavigate } from '@remix-run/react'
-import { nanoid } from 'nanoid'
 import invariant from 'tiny-invariant'
-import { Button, ButtonLink } from '~/components/Button'
+import { Button } from '~/components/Button'
 import { Input } from '~/components/Input'
 import { Label } from '~/components/Label'
 import { useUserMetadata } from '~/hooks/useUserMetadata'
@@ -22,12 +21,12 @@ export const action: ActionFunction = async ({ request }) => {
 	const formData = await request.formData()
 	const room = formData.get('room')
 	invariant(typeof room === 'string')
-	
+
 	// If room is empty or only whitespace, redirect to whenmeet.me
 	if (!room.trim()) {
 		return redirect('https://whenmeet.me')
 	}
-	
+
 	return redirect(room.replace(/ /g, '-'))
 }
 
@@ -37,12 +36,12 @@ export default function Index() {
 	const { data } = useUserMetadata(username)
 
 	return (
-		<div className="min-h-screen container mx-auto px-4 py-8 flex items-center">
-			 <div className="w-full">
+		<div className="min-h-[calc(100vh-127px)] h-full container mx-auto px-4 py-8 flex items-center">
+			<div className="w-full">
 				<h1 className="text-center text-3xl font-bold text-gray-900 sm:text-4xl md:text-5xl mb-8">
 					Join a meeting
 				</h1>
-				
+
 				<div className="max-w-lg mx-auto bg-white p-6 rounded-lg shadow">
 					<div>
 						<div className="flex items-center mb-4">
@@ -60,16 +59,9 @@ export default function Index() {
 							)}
 						</div>
 					</div>
-					<Form
-						className="space-y-6"
-						method="post"
-					>
+					<Form className="space-y-6" method="post">
 						<div>
-							<Label 
-								htmlFor="room" 
-							>
-								Meeting ID
-							</Label>
+							<Label htmlFor="room">Meeting ID</Label>
 							<Input
 								autoComplete="off"
 								name="room"
@@ -79,11 +71,7 @@ export default function Index() {
 								required
 							/>
 						</div>
-						<Button 
-							type="submit"
-						>
-							Join
-						</Button>
+						<Button type="submit">Join</Button>
 					</Form>
 				</div>
 			</div>

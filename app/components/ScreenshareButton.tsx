@@ -1,4 +1,3 @@
-import { VisuallyHidden } from '@radix-ui/react-visually-hidden'
 import type { FC } from 'react'
 import { useEffect, useState } from 'react'
 import { useRoomContext } from '~/hooks/useRoomContext'
@@ -49,7 +48,12 @@ export const ScreenshareButton: FC<ScreenshareButtonProps> = () => {
 				onClick={sharing ? endScreenShare : startScreenShare}
 				className="flex items-center gap-2 text-xs"
 			>
-				<span className="hidden lg:inline">{sharing ? 'Stop sharing' : 'Share screen'}</span>
+				<span className="hidden md:inline lg:hidden">
+					{sharing ? 'Stop' : 'Share'}
+				</span>
+				<span className="hidden lg:inline">
+					{sharing ? 'Stop sharing' : 'Share screen'}
+				</span>
 				<Icon type="screenshare" />
 			</Button>
 		</Tooltip>

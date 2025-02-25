@@ -1,4 +1,3 @@
-import { VisuallyHidden } from '@radix-ui/react-visually-hidden'
 import type { FC } from 'react'
 import { useKey } from 'react-use'
 import { useRoomContext } from '~/hooks/useRoomContext'
@@ -56,7 +55,7 @@ export const CameraButton: FC<ButtonProps> = ({ onClick, ...rest }) => {
 					{videoEnabled ? 'Cam off' : 'Cam on'}
 				</span>
 				<span className="hidden lg:inline">
-					{videoEnabled ? 'Disable camera' : 'Enable camera'}
+					{videoEnabled ? 'Camera off' : 'Camera on'}
 				</span>
 				<Icon type={videoEnabled ? 'videoOn' : 'videoOff'} />
 			</Button>

@@ -22,6 +22,9 @@ export const RaiseHandButton: FC<RaiseHandButtonProps> = ({
 			}}
 			className="flex items-center gap-2 text-xs"
 		>
+			<span className="hidden md:inline lg:hidden">
+				{raisedHand ? 'Hand' : 'Hand'}
+			</span>
 			<span className="hidden lg:inline">
 				{raisedHand ? 'Lower hand' : 'Raise hand'}
 			</span>

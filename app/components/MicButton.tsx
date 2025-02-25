@@ -62,8 +62,11 @@ export const MicButton: FC<
 					{...rest}
 					className="flex items-center gap-2 text-xs"
 				>
-					<span className="hidden md:inline">
-						{audioEnabled ? 'MUTE' : 'UNMUTE'}
+					<span className="hidden md:inline lg:hidden">
+						{audioEnabled ? 'Mute' : 'Unmute'}
+					</span>
+					<span className="hidden lg:inline">
+						{audioEnabled ? 'Mute me' : 'Unmute me'}
 					</span>
 					<Icon type={audioEnabled ? 'micOn' : 'micOff'} />
 				</Button>

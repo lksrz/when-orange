@@ -63,9 +63,9 @@ export default function Lobby() {
 	const isLeft = params.get('left') === 'true'
 
 	return (
-		<div className="h-[100vh] flex flex-col items-center justify-center h-full p-4">
-			<div className="flex-1"></div>
-			<div className="space-y-4 w-full max-w-5xl">
+		<div className="min-h-[calc(100vh-127px)] h-full flex flex-col items-center justify-center p-4">
+			<div className="flex-1 min-h-0"></div>
+			<div className="h-full space-y-4 w-full max-w-5xl">
 				<div>
 					{/* <h1 className="text-3xl font-bold">{roomName}</h1> */}
 					<p className="text-sm text-zinc-500 dark:text-zinc-400">
@@ -77,7 +77,7 @@ export default function Lobby() {
 				<div className="relative">
 					{userMedia.videoEnabled ? (
 						<SelfView
-							className="aspect-[4/3] w-full"
+							className="aspect-[4/3] w-full h-[60vh]"
 							videoTrack={videoStreamTrack}
 						/>
 					) : (
@@ -89,7 +89,7 @@ export default function Lobby() {
 							</div>
 						</div>
 					)}
-						<div className="absolute left-3 top-3">
+					<div className="absolute left-3 top-3">
 						{!sessionError && !session?.sessionId ? (
 							<Spinner className="text-zinc-100" />
 						) : (
@@ -158,24 +158,31 @@ export default function Lobby() {
 					<Button
 						onClick={() => {
 							setJoined(true)
-							const newParams = new URLSearchParams(params);
-							newParams.delete('left');
-							navigate('room' + (newParams.toString() ? '?' + newParams.toString() : ''))
+							const newParams = new URLSearchParams(params)
+							newParams.delete('left')
+							navigate(
+								'room' +
+									(newParams.toString() ? '?' + newParams.toString() : '')
+							)
 						}}
 						disabled={!session?.sessionId}
+						className="flex items-center gap-2 text-xs relative z-10"
+						autoFocus
 					>
-						{isLeft ? 'Rejoin' : 'Join'}
+						{!!session?.sessionId && (
+							<div className="absolute inset-0 border-2 border-green-600 rounded-md animate-ping" />
+						)}
+						<span className="md:inline">{isLeft ? 'Rejoin' : 'Join'}</span>
 					</Button>
 					<MicButton />
 					<CameraButton />
 					<SettingsButton />
-					<Tooltip content="Copy URL">
+					<Tooltip content="Copy meeting link">
 						<CopyButton contentValue={roomUrl}></CopyButton>
 					</Tooltip>
 				</div>
 			</div>
-			<div className="flex flex-col justify-end flex-1">
-			</div>
+			<div className="flex flex-col justify-end flex-1 min-h-0"></div>
 		</div>
 	)
 }

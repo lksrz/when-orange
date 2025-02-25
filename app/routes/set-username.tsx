@@ -20,12 +20,12 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
 export default function SetUsername() {
 	return (
-		<div className="min-h-screen container mx-auto px-4 py-8 flex items-center">
-			 <div className="w-full">
+		<div className="min-h-[calc(100vh-127px)] h-full container mx-auto px-4 py-8 flex items-center">
+			<div className="w-full">
 				<h1 className="text-center text-3xl font-bold text-gray-900 sm:text-4xl md:text-5xl mb-8">
 					Your name
 				</h1>
-				
+
 				<div className="max-w-lg mx-auto bg-white p-6 rounded-lg shadow">
 					<Form className="space-y-6" method="post">
 						<div>
@@ -39,9 +39,7 @@ export default function SetUsername() {
 								name="username"
 							/>
 						</div>
-							<Button type="submit">
-								Submit
-							</Button>
+						<Button type="submit">Submit</Button>
 					</Form>
 				</div>
 			</div>

@@ -8,6 +8,7 @@ import {
 } from '@remix-run/react'
 import { useEffect, useState } from 'react'
 import { useMount, useWindowSize } from 'react-use'
+import invariant from 'tiny-invariant'
 import { AiButton } from '~/components/AiButton'
 import { CameraButton } from '~/components/CameraButton'
 import { CopyButton } from '~/components/CopyButton'
@@ -17,7 +18,6 @@ import { LeaveRoomButton } from '~/components/LeaveRoomButton'
 import { MicButton } from '~/components/MicButton'
 import { OverflowMenu } from '~/components/OverflowMenu'
 import { ParticipantLayout } from '~/components/ParticipantLayout'
-import { ParticipantsButton } from '~/components/ParticipantsMenu'
 import { PullAudioTracks } from '~/components/PullAudioTracks'
 import { RaiseHandButton } from '~/components/RaiseHandButton'
 import { ScreenshareButton } from '~/components/ScreenshareButton'
@@ -31,7 +31,6 @@ import useStageManager from '~/hooks/useStageManager'
 import { useUserJoinLeaveToasts } from '~/hooks/useUserJoinLeaveToasts'
 import getUsername from '~/utils/getUsername.server'
 import isNonNullable from '~/utils/isNonNullable'
-import invariant from 'tiny-invariant'
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 	const username = await getUsername(request)
@@ -73,7 +72,13 @@ export default function Room() {
 	)
 }
 
-function JoinedRoom({ bugReportsEnabled, roomName }: { bugReportsEnabled: boolean, roomName: string }) {
+function JoinedRoom({
+	bugReportsEnabled,
+	roomName,
+}: {
+	bugReportsEnabled: boolean
+	roomName: string
+}) {
 	const { hasDb, hasAiCredentials } = useLoaderData<typeof loader>()
 	const {
 		userMedia,
@@ -144,7 +149,7 @@ function JoinedRoom({ bugReportsEnabled, roomName }: { bugReportsEnabled: boolea
 			<div className="h-[100vh] flex flex-col bg-white">
 				<div className="relative flex-1 min-h-0">
 					<div
-						className="absolute inset-0 flex isolate gap-[var(--gap)] p-[var(--gap)]"
+						className="absolute inset-0 flex isolate gap-[var(--gap)] p-2 sm:p-[var(--gap)]"
 						style={
 							{
 								'--gap': '1rem',
@@ -162,7 +167,7 @@ function JoinedRoom({ bugReportsEnabled, roomName }: { bugReportsEnabled: boolea
 					</div>
 					<Toast.Viewport className="absolute bottom-0 right-0" />
 				</div>
-				<div className="flex gap-4 text-sm pt-0 p-4">
+				<div className="flex pt-0 sm:pt-0 gap-1 sm:gap-4 text-sm p-2 sm:p-4 ">
 					{hasAiCredentials && <AiButton recordActivity={recordActivity} />}
 					<MicButton warnWhenSpeakingWhileMuted />
 					<CameraButton />
