@@ -6,7 +6,7 @@ import {
 	useParams,
 	useSearchParams,
 } from '@remix-run/react'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useMount, useWindowSize } from 'react-use'
 import invariant from 'tiny-invariant'
 import { AiButton } from '~/components/AiButton'
@@ -31,6 +31,8 @@ import useStageManager from '~/hooks/useStageManager'
 import { useUserJoinLeaveToasts } from '~/hooks/useUserJoinLeaveToasts'
 import getUsername from '~/utils/getUsername.server'
 import isNonNullable from '~/utils/isNonNullable'
+import { TranscriptionService } from "~/components/TranscriptionService";
+import { TranscriptionPanel } from "~/components/TranscriptionPanel";
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 	const username = await getUsername(request)
@@ -142,6 +144,23 @@ function JoinedRoom({
 		(u) => !pinnedTileIds.includes(u.id)
 	)
 
+	const [transcriptions, setTranscriptions] = useState<Transcription[]>([])
+
+	const isTranscriptionHost = useMemo(() => {
+		const sortedUsers = [...otherUsers].sort((a, b) =>
+			new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime()
+		)
+		return sortedUsers[0]?.id === identity?.id
+	}, [otherUsers, identity])
+
+	const allRemoteAudioTracks = useMemo(() => {
+		return otherUsers
+			.filter((u) => u.id !== identity?.id)
+			.flatMap((u) => u.tracks.audio)
+	}, [otherUsers, identity])
+
+	const [showTranscription, setShowTranscription] = useState(false)
+
 	return (
 		<PullAudioTracks
 			audioTracks={otherUsers.map((u) => u.tracks.audio).filter(isNonNullable)}
@@ -185,6 +204,21 @@ function JoinedRoom({
 			</div>
 			<HighPacketLossWarningsToast />
 			<IceDisconnectedToast />
+			{isTranscriptionHost && (
+				<TranscriptionService
+					audioTracks={allRemoteAudioTracks}
+					isActive={isTranscriptionHost}
+					onTranscription={(t) =>
+						setTranscriptions((prev) => [...prev, t])
+					}
+				/>
+			)}
+			<button onClick={() => setShowTranscription((v) => !v)}>
+				{showTranscription ? "Hide" : "Show"} Transcription
+			</button>
+			{showTranscription && (
+				<TranscriptionPanel transcriptions={transcriptions} />
+			)}
 		</PullAudioTracks>
 	)
 }

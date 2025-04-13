@@ -1,5 +1,25 @@
 # Implementation Plan: Real-time Transcription for Meeting App
 
+## Status Update
+
+### ✅ **Completed**
+- Scaffolded `components/TranscriptionService.tsx` (handles host logic, audio track collection, OpenAI WebSocket setup, and local transcription storage)
+- Scaffolded `components/TranscriptionPanel.tsx` (displays transcription results in the UI)
+- Host determination logic implemented in the room page (first joiner/organizer)
+- UI toggle and panel for showing/hiding transcriptions added to the room page
+- Transcription results displayed in real time for the host
+
+### 🟡 **In Progress / To Do**
+- Implement audio streaming from the mixed audio context to the OpenAI WebSocket in the required format
+- Implement `/api/transcription-token` endpoint to securely provide short-lived OpenAI API tokens to the frontend
+- Add audio mixing, noise suppression, and proper formatting for OpenAI (PCM, etc.)
+- Add robust error handling and reconnection logic for the WebSocket and audio context
+- Add speaker identification, search, and export features to the transcription panel
+- Add visual indicators for transcription status to all participants
+- Implement host failover logic if the transcription host leaves
+- Add participant opt-out and clear indication when transcription is active
+- Unit, integration, and performance tests for the transcription flow
+
 ## Overview
 
 This plan outlines how to add real-time transcription to our meeting application, where the meeting organizer/first participant acts as the transcription host to avoid centralizing voice transmission through our servers. The system will leverage OpenAI's real-time transcription API via WebRTC to process the audio locally on the organizer's client.
@@ -183,11 +203,9 @@ const setupAudioProcessing = async () => {
 ```tsx
 // In Room.tsx
 const isTranscriptionHost = useMemo(() => {
-  // First person to join becomes host
   const sortedUsers = [...room.roomState.users].sort((a, b) => 
     new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime()
   );
-  
   return sortedUsers[0]?.id === identity?.id;
 }, [room.roomState.users, identity]);
 
