@@ -1,0 +1,26 @@
+---
+description: Apply these rules when making changes to the project
+globs:
+alwaysApply: true
+---
+
+Update this rule if user requested changes to the project requirement, etc.
+flowchart TD
+    A[Initial Load _index route] --> B{Username Present?}
+    B -->|No| C[Set Username route _set-username]
+    B -->|Yes| D[Entering Room route _room]
+    C --> D
+    D --> E[Lobby route _room.$roomName._index]
+    E --> F[Display Lobby Preview and Participant List]
+    F --> G[Click Join Button]
+    G --> H[Room route _room.$roomName.room]
+    H --> I[Setup Media Streams using getUserMedia]
+    I --> J[Manage Media with partytracks, VideoSrcObject, AudioStream]
+    J --> K[Establish WebSocket with ChatRoom Durable Object]
+    K --> L[Durable Object Communication: onStart, onConnect, onMessage, onClose]
+    L --> M[Broadcast Room State and Heartbeat Management]
+    M --> N[Local and Remote Media Management: Mute, Screen Share, Raise Hand]
+    N --> O[Optional Features]
+    O -->|AI Assistant Enabled| P[Establish PeerConnection with OpenAI service]
+    O -->|Transcription Required| Q[Transcription Host receives mixed audio]
+    Q --> R[Send Audio via WebSockets to OpenAI Transcription Service]

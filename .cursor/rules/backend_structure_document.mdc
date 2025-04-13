@@ -1,0 +1,163 @@
+---
+description: Apply these rules when making changes to the project
+globs:
+alwaysApply: true
+---
+
+Update this rule if user requested changes to the project requirement, etc.
+# Backend Structure Document
+
+This document outlines the backend architecture and infrastructure for the Orange Meets project. The goal is to provide an easy-to-understand view of how the backend is structured, how data is managed, how various endpoints interact, and how the overall system is hosted and monitored. Below is a detailed overview organized into practical sections.
+
+## 1. Backend Architecture
+
+The backend is built on a modern, cloud-first architecture designed for scalability and performance. Key components include:
+
+*   **Cloudflare Workers:** The application runs on Cloudflare Workers for a serverless edge computing model, ensuring low latency and global reach.
+*   **Cloudflare Durable Objects:** These are employed to maintain real-time state for video conferencing rooms, managing participant lists, room lifecycles, and state synchronization between clients.
+*   **Cloudflare Calls:** Integrated to handle signaling for WebRTC sessions, enabling real-time video and audio connections.
+*   **Partyserver Library & Drizzle ORM:** The Partyserver aids in managing peer connections and message handling, while Drizzle ORM is used to interface with our persistent SQL storage where needed.
+
+The architecture uses asynchronous communication patterns and WebSockets to support high volume, real-time interactions. It is designed to be:
+
+*   **Scalable:** Automatically scales across Cloudflare's global network.
+*   **Maintainable:** Clearly defined modules (such as Durable Objects for room management) and separation of concerns make future updates straightforward.
+*   **High Performance:** Edge computing minimizes the distance between users and the servers, while efficient state management ensures rapid synchronization.
+
+## 2. Database Management
+
+The Orange Meets project utilizes both in-memory and persistent database solutions to handle various types of data:
+
+*   **Real-time Room State Management:**
+
+    *   Utilizes Cloudflare Durable Objects to store transient information like current room participants, room status, and signaling data.
+    *   Data inside Durable Objects is ephemeral and optimized for rapid updates.
+
+*   **Persistent Data Storage (D1 for Bug Reporting and Logging):**
+
+    *   Uses Cloudflare D1, a SQL-based storage solution, for storing persistent data such as bug reports, event logs, and possibly transcription summaries.
+
+*   **Database Technologies Used:**
+
+    *   **Cloudflare D1** (SQL database)
+    *   **Cloudflare Durable Objects** (for state management)
+    *   **Drizzle ORM** (for object-relational mapping and easier database operations)
+
+Data is structured according to the nature of its use: real-time data remains in memory (Durable Objects), while persistent logs and bug reports are stored in the SQL database. Practices such as data normalization, indexing, and controlled access help keep the database efficient and robust.
+
+## 3. Database Schema
+
+### Human Readable Format:
+
+The primary persistent database is used to store bug reports and similar logs. The schema is designed to be simple but flexible. The following describes the schema in everyday language:
+
+*   **Bug Reports Table:**
+
+    *   Each record represents a unique bug or issue reported from a client session.
+    *   Records contain an identification number, reference to the user (if available), detailed description of the bug, a timestamp, and possibly a severity/status indicator.
+
+### Example SQL Schema (for Cloudflare D1):
+
+-- Create a table to store bug reports CREATE TABLE bug_reports ( id SERIAL PRIMARY KEY, user_id VARCHAR(255) NULL, -- the user who reported the bug, if available description TEXT NOT NULL, -- details of the bug or error encountered severity VARCHAR(50) DEFAULT 'low', -- severity level of the issue created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP );
+
+-- Create indexes to speed up queries on bug reports CREATE INDEX idx_bug_reports_created_at ON bug_reports(created_at);
+
+The schema can be extended to include additional tables in the future, such as for transcription summaries or user activity logs, as project needs evolve.
+
+## 4. API Design and Endpoints
+
+The project exposes several APIs primarily via Cloudflare Workers. The design follows RESTful principles, though real-time communication is handled via WebSockets. Key endpoints include:
+
+*   **Room Management Endpoints:**
+
+    *   **POST /api/rooms:** Create a new video conferencing room.
+    *   **GET /api/rooms/{roomId}:** Fetch details for a specific room (such as current participants and room settings).
+    *   **PUT /api/rooms/{roomId}:** Update room state, e.g., when a participant joins or leaves.
+
+*   **Chat and Signaling Endpoints:**
+
+    *   **WebSocket /ws/chat:** Establish a persistent connection for exchanging real-time signaling messages and chat content. This is part of managing the participant communications inside a room.
+
+*   **AI Assistant Endpoints (Optional):**
+
+    *   **POST /api/ai-assistant:** Connect to the OpenAI service. Manage sessions for the push-to-talk AI assistant.
+    *   Handles real-time transcription communications when the AI assistant is activated.
+
+These endpoints bridge communication between the frontend (built with React, Remix, and TypeScript) and the backend, ensuring smooth operation of features like room management, chat, video streaming, and optional AI interactions.
+
+## 5. Hosting Solutions
+
+The entire backend runs in a serverless environment on Cloudflare's global network. Key benefits include:
+
+*   **Cloudflare Workers:** Automatically distributes compute tasks to edge locations, reducing latency significantly.
+*   **Built-In Scalability:** The serverless model automatically adjusts to traffic demands without manual intervention.
+*   **Cost-Effectiveness:** Pay-per-use pricing ensures that resources are only consumed when needed, which is efficient for a demo and production environment alike.
+
+This hosting approach ensures that the Orange Meets application is globally accessible and performs well under varying loads.
+
+## 6. Infrastructure Components
+
+The backend infrastructure is reinforced by several key components:
+
+*   **Load Balancers:** Cloudflare's native load balancing directs user requests efficiently across the global network.
+*   **Caching Mechanisms:** Cloudflare’s caching services reduce redundant data fetching, speeding up content delivery.
+*   **Content Delivery Network (CDN):** The global network of Cloudflare caches static assets, which improves the user experience by decreasing load times.
+*   **WebSocket Servers and Durable Objects:** These provide real-time communication and state management for video conferencing rooms.
+*   **ORM Layer:** Drizzle ORM abstracts database queries, ensuring that interactions with Cloudflare D1 remain efficient and secure.
+
+The seamless integration of these components helps maintain high performance and an excellent user experience even during peak usage times.
+
+## 7. Security Measures
+
+Security is a top priority for Orange Meets. The backend incorporates multiple layers of protection:
+
+*   **Authentication & Session Management:**
+
+    *   Users are verified via session cookies set during the username setup process. This simple authentication mechanism works effectively with an edge-based environment.
+
+*   **Data Encryption:**
+
+    *   All communications between client and server are secured via TLS/SSL. This applies to API calls, WebSocket communications, and database connections.
+
+*   **Edge Security:**
+
+    *   Running on Cloudflare Workers means that many threats (such as DDoS attacks) are mitigated before reaching the application.
+
+*   **Controlled Access:**
+
+    *   Durable Objects and SQL database access are safeguarded with strict API endpoint protection and SSL certificates, reducing the risk of unauthorized access.
+
+These practices ensure that user data and communications remain secure, adhering to compliance standards and best practices in data protection.
+
+## 8. Monitoring and Maintenance
+
+To keep the backend running smoothly, a combination of automated and manual monitoring strategies is in place:
+
+*   **Performance Monitoring Tools:** Cloudflare’s analytics provide real-time insights on request latency, error rates, and overall system health.
+*   **Logging and Error Reporting:** Detailed logs (including bug reports stored in Cloudflare D1) enable quick diagnosis and resolution of issues.
+*   **Testing Frameworks:** Tools like Vitest and Playwright are employed to conduct regular tests. MSW is used for mocking services during development to ensure endpoints and communications remain stable.
+*   **Routine Maintenance:** Automated alerts and scheduled tasks help ensure that software, including Durable Objects and Workers scripts, is updated and maintained.
+
+These practices guarantee that the backend remains robust, responsive, and up-to-date with minimal downtime.
+
+## 9. Conclusion and Overall Backend Summary
+
+The backend for Orange Meets is a robust, cloud-native solution that leverages the power of Cloudflare Workers and Durable Objects for real-time, scalable video conferencing. Key benefits include:
+
+*   **A Modern, Modular Architecture:** Designed with scalability, maintainability, and performance in mind.
+*   **Efficient Data Management:** Combines transient in-memory state (Durable Objects) with persistent storage (Cloudflare D1) using Drizzle ORM.
+*   **Comprehensive API Design:** Enables seamless real-time communication and integration with additional services like the optional AI assistant.
+*   **Reliable and Secure Hosting:** Utilizes Cloudflare’s edge network, load balancers, and CDN to deliver content quickly and securely.
+*   **Well-Defined Infrastructure:** Incorporates effective security measures, monitoring, and maintenance practices to ensure uninterrupted operation.
+
+Overall, the backend structure aligns well with the project’s goal of providing a feature-rich, real-time video conferencing solution with enhanced capabilities like transcription and AI assistance. The design choices and hosting solutions set Orange Meets apart, offering smooth user experiences and demonstrating strong technical resilience.
+
+By using the following tech stacks:
+
+*   Cloudflare Workers
+*   Cloudflare Durable Objects
+*   Cloudflare Calls
+*   Drizzle ORM
+*   Partyserver
+
+this backend not only meets the current project requirements but is also flexible enough to scale and incorporate future features or integrations.

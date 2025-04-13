@@ -1,0 +1,122 @@
+---
+description: Apply these rules when making changes to the project
+globs:
+alwaysApply: true
+---
+
+Update this rule if user requested changes to the project requirement, etc.
+# Project Requirements Document: Orange Meets (WhenMeet.me Call)
+
+## 1. Project Overview
+
+Orange Meets is an advanced video conferencing application built using WebRTC technology, particularly leveraging the robust capacities of Cloudflare Calls, Workers, and Durable Objects. This project aims to demonstrate real-time communication capabilities, allowing users to join unique virtual meeting rooms. The application is powerful in its simplicity, offering core features like audio/video calls and screen sharing, all enhanced by a modern, user-friendly interface designed with React, Remix, and Tailwind CSS. Additionally, it integrates optional AI functionalities through the OpenAI API to offer enhanced meeting support.
+
+The primary purpose of this application is to deliver a high-quality, scalable video conferencing solution that is easy to deploy and use. The key objectives include providing seamless real-time interactions, effective room management, and a highly responsive user interface. The application’s success is gauged by its performance stability, ease of use, and the integration of advanced features like a real-time AI assistant and transcription service.
+
+## 2. In-Scope vs. Out-of-Scope
+
+**In-Scope:**
+
+*   Real-time video and audio communication using WebRTC.
+*   Advanced room management using Durable Objects for state tracking and synchronization.
+*   Modern UI/UX design supporting features like mute/unmute, video enable/disable, and screen sharing.
+*   Integration with OpenAI for optional AI assistant including features like push-to-talk.
+*   Real-time transcription of meetings as described in `TODO_Realtime_transcription.md`.
+*   Data Saver Mode (limits video feed bandwidth).
+*   Debugging and bug reporting tools.
+
+**Out-of-Scope:**
+
+*   Custom design systems beyond Radix UI and Tailwind CSS.
+*   Large-scale user management systems (e.g., enterprise SSO integration).
+*   Advanced AI capabilities beyond basic interaction in meetings.
+*   Native mobile application development.
+*   Comprehensive analytics beyond current meeting state and usage reports.
+
+## 3. User Flow
+
+A new user accesses Orange Meets by entering their meeting ID on the landing page. If they have not previously set a username, they are redirected to a setup page to input their display name, which is then stored in a session cookie. Once entered, the user is directed to enter the meeting room, where they must permit access to their camera and microphone. Following device approval, users see a preview of their video/audio in a lobby screen, allowing them to adjust settings before joining.
+
+Upon joining the meeting, a WebRTC connection is initialized using backend resources hosted on Cloudflare, while the user begins seeing and interacting with other participants. Advanced functionalities like screen sharing, AI assistant interactions, and real-time transcription are accessible. The AI feature, when activated, provides interactive support through a push-to-talk setup, while transcription services ensure all dialogue is captured accurately, meeting modern compliance standards.
+
+## 4. Core Features (Bullet Points)
+
+*   **Video Conferencing:**
+
+    *   WebRTC-based real-time audio and video communication.
+    *   Screen share capabilities.
+    *   Controls for mute/unmute and video on/off switches.
+
+*   **Room Management:**
+
+    *   Durable Objects for real-time state management and user tracking.
+    *   Unique room link generation for easy access.
+    *   Inactive room cleanup and connection heartbeat features.
+
+*   **UI & Controls:**
+
+    *   React-based interface with Tailwind CSS and Radix UI components.
+    *   Audio level indicators and media device settings.
+    *   Interactive controls like raise hand, meeting link sharing, and settings configuration.
+
+*   **Optional AI Assistant:**
+
+    *   Integrated using the OpenAI API.
+    *   Features a push-to-talk interface with easy-to-customize settings.
+
+*   **Real-time Transcription:**
+
+    *   Audio streams processed for transcription to provide text-based dialogue records.
+    *   Utilizes a transcription host to aggregate and send data to external processing services.
+
+*   **Debugging & Bug Reporting:**
+
+    *   In-app tools for reporting issues, supported by a D1 storage backend.
+
+## 5. Tech Stack & Tools
+
+*   **Frontend:**
+
+    *   React, Remix, TypeScript.
+    *   Tailwind CSS for styling and Radix UI for components.
+    *   PartyTracks and RxJS for media management and data handling.
+
+*   **Backend:**
+
+    *   Cloudflare Workers for serverless operations.
+    *   Cloudflare Durable Objects for state management.
+    *   Cloudflare Calls for managing media sessions.
+    *   Drizzle ORM for database interactions.
+
+*   **Optional AI:**
+
+    *   Powered by the OpenAI API for meeting assistance features.
+
+*   **Development Tools:**
+
+    *   MSW, Vitest, and Playwright for testing.
+    *   Cursor for efficient integrated development and AI-powered code suggestions.
+
+## 6. Non-Functional Requirements
+
+*   **Performance:** The application must handle media streams with minimal latency, maintaining user interaction responsiveness under load.
+*   **Security:** Secure device media access and encrypted WebSocket communication are crucial.
+*   **Usability:** A clean, intuitive user interface to accommodate users of all technical levels. Accessibility features such as clear audio indications and real-time transcription are embedded.
+*   **Compliance:** Ensure data privacy by obtaining explicit user consent for media access and transcription.
+
+## 7. Constraints & Assumptions
+
+*   The entire architecture is based on availability and functionality of Cloudflare’s ecosystem (Workers, Durable Objects, Calls).
+*   Dependence on OpenAI API availability for AI assistant functionality.
+*   Assumes users have access to compatible hardware and browser standards for WebRTC.
+*   Stable network conditions are assumed for best performance.
+
+## 8. Known Issues & Potential Pitfalls
+
+*   **Network Issues:** Potential delays due to poor connections could impact media quality.
+*   **WebRTC Challenges:** Peer-to-peer setups might fail in varying network configurations.
+*   **Durable Objects:** Risks such as race conditions and state inconsistencies must be monitored.
+*   **API Limitations:** OpenAI API rate limits and service availability could affect AI functionality.
+*   **Browser Compatibility:** Ensure comprehensive testing across major browsers to overcome media permission variances.
+
+This document serves as the primary guiding source for an AI which will follow to create subsequent technical documents such as architecture plans and user guide. Each section is designed for clarity, ensuring no ambiguity as development progresses.

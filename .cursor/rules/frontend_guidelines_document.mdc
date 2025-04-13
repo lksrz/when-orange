@@ -1,0 +1,107 @@
+---
+description: Apply these rules when making changes to the project
+globs:
+alwaysApply: true
+---
+
+Update this rule if user requested changes to the project requirement, etc.
+# Frontend Guideline Document for Orange Meets
+
+This document serves as a guide to the frontend architecture, design principles, and techniques used in the Orange Meets (WhenMeet.me Call) project. It is designed to be understandable by technical and non-technical stakeholders alike.
+
+## 1. Frontend Architecture
+
+Orange Meets is built using a modern, modular approach. The primary frameworks and libraries include React for building dynamic user interfaces, Remix for server-side rendering and routing, and TypeScript to promote type safety throughout the codebase. Our application leverages Tailwind CSS for styling and Radix UI for accessible, composable components.
+
+In addition to these key tools, the project makes use of PartyTracks for managing dummy video conferencing elements, RxJS for reactive programming patterns, and React Query for efficient data fetching and caching. This architecture ensures that the application is scalable, maintainable, and capable of delivering excellent performance even as the project grows in scope and complexity.
+
+## 2. Design Principles
+
+The development of Orange Meets is guided by several core design principles:
+
+- **Usability:** The interface is designed to be intuitive with clear visual cues, enabling users to quickly learn how to navigate and use the various features such as video calling, room management, and real-time transcription.
+- **Accessibility:** We adhere to best practices for accessibility ensuring that our application is usable by people with diverse abilities. This includes the use of properly labeled controls and keyboard navigability.
+- **Responsiveness:** The application is built to adapt to various screen sizes and devices, ensuring a seamless experience whether on desktop, tablet, or mobile.
+
+By putting these principles at the forefront, we create a user interface that is both welcoming and effective for all users.
+
+## 3. Styling and Theming
+
+Our styling approach focuses on a modern, flat aesthetic with subtle hints of glassmorphism to provide a sleek, contemporary look. The styling is driven by Tailwind CSS, which gives us the flexibility to design with utility-first classes without writing much custom CSS.
+
+### CSS Methodologies & Tools:
+
+- **Tailwind CSS:** Provides a utility-first approach to styling that ensures consistency and rapid development.
+- **Radix UI:** Offers accessible components which work seamlessly with Tailwind's design language.
+
+### Theming Details:
+
+- **Style:** We adopt a modern, flat design with touches of glassmorphism. Visual elements are clean and straightforward, ensuring that functionality is at the forefront of the design.
+- **Color Palette:**
+  - Primary: Orange (#FF7F00) – Reflects the branding of Orange Meets and brings energy to the UI.
+  - Secondary: Deep Navy (#1F2937) – Provides a strong contrast for text and UI accents.
+  - Accent: Soft Grey (#F3F4F6) – Used for backgrounds and subtle borders to maintain a modern feel.
+  - Highlights: Light Blue (#3B82F6) – Employed for interactive elements and call-to-action buttons.
+
+- **Fonts:** The application uses system-friendly fonts with a preference for modern sans-serif fonts. The default font is set to `Inter`, which is widely used for its legibility and contemporary look.
+
+## 4. Component Structure
+
+The frontend is built using a component-based architecture, where each piece of the application is broken down into smaller, reusable components. These include user interface elements (buttons, dialogs, video elements) and more complex containers that handle state and logic.
+
+- **Organization:** Components are organized in a clear directory structure that makes them easy to locate and maintain. Each component is responsible for its own styling and logic, promoting a separation of concerns.
+- **Reusability:** The use of Radix UI and tailored custom components ensures that common elements (such as modals, buttons, and form inputs) can be reused across different parts of the application.
+
+This modular approach enhances maintainability by allowing developers to update individual components without affecting the whole system.
+
+## 5. State Management
+
+Managing state effectively is crucial for a seamless user experience, especially in a real-time video conferencing app like Orange Meets. The frontend uses a combination of state management libraries and patterns:
+
+- **React Query:** Handles data fetching, caching, and synchronization with server state, ensuring that the UI is always responsive to underlying data changes.
+- **Context API (with RxJS):** Used for managing application-wide states, especially where real-time interactions such as chat messages, room participants, and transcription data are concerned.
+
+These techniques ensure that data is efficiently shared across components and updated in real time, creating a smooth and consistent user experience.
+
+## 6. Routing and Navigation
+
+Routing is handled by Remix, which simplifies navigation between different pages and ensures that server-rendering and client-side transitions are fast and seamless.
+
+- **Library in Use:** Remix takes care of both routing and data fetching, ensuring each page loads quickly and handles transitions effectively.
+- **Navigation Structure:**
+  - The landing page handles the username setup and initial session management.
+  - Room entry pages manage the video conferencing interface, including media permissions, room setup, and state management.
+  - Specific modals and dialogs (for example, settings and AI assistant interactions) overlay on top of the main UI, ensuring user context is maintained.
+
+## 7. Performance Optimization
+
+To ensure optimal performance and a high-quality user experience, several key strategies are implemented:
+
+- **Lazy Loading & Code Splitting:** Components and pages are loaded as needed, reducing initial load times.
+- **Asset Optimization:** Images, fonts, and other resources are optimized to ensure fast loading times.
+- **Efficient State Management:** Using React Query and RxJS minimizes unnecessary re-renders and helps in maintaining a smooth UI.
+
+These performance optimizations not only speed up the application but also reduce resource usage, making the application scalable even under high load.
+
+## 8. Testing and Quality Assurance
+
+Reliability and quality are paramount. The following testing strategies ensure our application works as expected:
+
+- **Unit Tests:** Written using Vitest to cover individual functions and UI components.
+- **Integration Tests:** Ensure that multiple components work together correctly. These tests catch issues that may arise from component interactions.
+- **End-to-End Tests:** Leveraging Playwright to simulate user interactions through the application from start to finish.
+- **Mocking Services:** MSW (Mock Service Worker) is used to simulate backend interactions during testing, ensuring that tests don’t rely on live data.
+
+These layers of testing help catch bugs early and maintain a high standard of code quality throughout development.
+
+## 9. Conclusion and Overall Frontend Summary
+
+The frontend of Orange Meets is built with modern, robust technologies like React, Remix, TypeScript, and Tailwind CSS, ensuring a dynamic, responsive, and accessible user interface. Our component-based architecture combines with efficient state management and performance optimizations to deliver a seamless real-time video conferencing experience.
+
+The project’s use of advanced tools for testing and quality assurance underlines our commitment to maintainability and user satisfaction. The careful application of design principles and thoughtful styling ensures that Orange Meets not only performs well but also offers a modern, engaging visual experience.
+
+By adhering to these guidelines, developers and designers can work together effectively, ensuring that the frontend setup remains clear, robust, and aligned with the project’s goals and user needs.
+
+---
+
+This comprehensive guide should serve as a reference for anyone involved in the development or maintenance of the Orange Meets frontend, ensuring clarity and consistency across the entire codebase.

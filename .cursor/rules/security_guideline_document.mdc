@@ -1,0 +1,203 @@
+---
+description: Apply these rules when making changes to the project
+globs:
+alwaysApply: true
+---
+
+Update this rule if user requested changes to the project requirement, etc.
+# Security Guideline Document and Implementation Plan for Orange Meets
+
+The following document outlines the security guidelines and implementation plan for the Orange Meets (WhenMeet.me Call) project. This plan is designed to ensure that the project adheres to secure coding principles by design, implements defense-in-depth strategies, and follows industry best practices throughout the development lifecycle.
+
+---
+
+## 1. Overview
+
+- **Project Name:** Orange Meets (WhenMeet.me Call)
+- **Description:** A WebRTC video conferencing demo application providing real-time communication, room management, and optional AI-assisted transcription features.
+- **Tech Stack:**
+  - **Frontend:** React, Remix, TypeScript, Tailwind CSS, Radix UI, PartyTracks, RxJS, React Query
+  - **Backend:** Cloudflare Workers, Durable Objects, Cloudflare Calls, Drizzle ORM (D1 database), Partyserver
+  - **AI (Optional):** OpenAI API
+  - **Testing:** MSW, Vitest, Playwright
+  - **Tooling:** Wrangler CLI
+
+---
+
+## 2. Core Security Principles and Practices
+
+- **Security by Design:** Ensure that security is embedded from conception through implementation, testing, and deployment.
+- **Least Privilege:** Grant only the minimal permissions necessary to each component, user, and service.
+- **Defense in Depth:** Implement multiple layers of security so that the failure of one control does not lead to a complete compromise.
+- **Input Validation & Output Encoding:** Validate all external inputs and encode outputs as necessary to prevent injection and scripting attacks.
+- **Fail Securely:** Ensure error handling and failure responses do not expose sensitive data or system details.
+- **Keep Security Simple & Secure Defaults:** Favor simple, clear, and secure settings by default to prevent misconfiguration.
+
+---
+
+## 3. Security Guidelines
+
+### 3.1 Authentication & Access Control
+
+- **Robust Authentication:** 
+  - Enforce strong, multi-factor authentication (MFA) especially for accessing sensitive endpoints or actions.
+  - Use secure protocols and storage for authentication tokens (e.g., JWT with proper configuration: signature verification, expiration checks, and secure algorithm selection).
+
+- **Session Management:** 
+  - Generate and handle unpredictable session identifiers.
+  - Implement idle and absolute timeouts for sessions.
+  - Secure session termination (logout mechanism) and guard against session fixation.
+
+- **Role-Based Access Control (RBAC):** 
+  - Clearly define user roles and permissions.
+  - Enforce strict server-side authorization checks to prevent privilege escalation.
+
+---
+
+### 3.2 Input Handling & Processing
+
+- **Prevent Injection Attacks:**
+  - Use parameterized queries and prepared statements (e.g., via Drizzle ORM).
+  - Sanitize all user inputs, including those affecting WebSocket connections and media device access.
+
+- **Mitigate Cross-Site Scripting (XSS):**
+  - Use context-aware output encoding for all user-supplied data.
+  - Apply content security policies (CSP) to restrict allowable content origins.
+
+- **Validate Redirects & File Uploads:**
+  - Validate and whitelist all URLs used for redirects.
+  - Secure file upload endpoints by checking file types, sizes, and scanning contents if required.
+
+- **Server-Side Validation:**
+  - Never rely solely on client-side validations; enforce robust validation on the server.
+
+---
+
+### 3.3 Data Protection & Privacy
+
+- **Encryption:**
+  - Encrypt sensitive data at rest (e.g., databases) and in transit (using TLS 1.2+).
+
+- **Cryptography:**
+  - Use industry-standard cryptographic algorithms (AES-256 for data encryption, Argon2 or bcrypt for password hashing).
+
+- **Secret Management:**
+  - Avoid hardcoding API keys or secrets; use a dedicated secrets management solution.
+
+- **Data Minimization:**
+  - Only store or process the minimum personal data required. Follow standards such as GDPR or CCPA for PII handling.
+
+---
+
+### 3.4 API & Service Security
+
+- **Enforce HTTPS:**
+  - Mandate TLS encryption for all communications, especially for WebSocket connections and API endpoints.
+
+- **Rate Limiting & Throttling:**
+  - Implement rate limiting to mitigate brute-force attacks and denial-of-service attempts.
+
+- **Secure CORS Configuration:**
+  - Restrict API access by configuring CORS policies to allow only trusted origins.
+
+- **Proper API Method Usage:**
+  - Use appropriate HTTP methods (GET, POST, PUT, DELETE) to align with intended actions.
+
+---
+
+### 3.5 Web Application Security Hygiene
+
+- **CSRF Protection:**
+  - Use anti-CSRF tokens (e.g., synchronizer token pattern) for state-changing requests.
+
+- **Security Headers:**
+  - Implement HTTP security headers like Content-Security-Policy, Strict-Transport-Security, X-Content-Type-Options, X-Frame-Options, and Referrer-Policy.
+
+- **Secure Cookie Attributes:**
+  - Set cookies with HttpOnly, Secure, and SameSite attributes.
+
+- **Clickjacking Prevention:**
+  - Use headers like X-Frame-Options or implement CSP frame-ancestors to prevent clickjacking.
+
+---
+
+### 3.6 Infrastructure & Configuration Management
+
+- **Server Hardening:**
+  - Follow best practices to harden Cloudflare Workers, Durable Objects, and any related backend services.
+  - Disable debugging or verbose error messages in production.
+
+- **Software Updates & Dependency Management:**
+  - Regularly update all libraries and dependencies, using lockfiles for consistent builds.
+  - Use tools for Software Composition Analysis (SCA) to monitor and address vulnerability issues.
+
+- **Secure TLS/SSL Configuration:**
+  - Use strong cipher suites and disable weak protocols.
+
+---
+
+## 4. Implementation Plan
+
+### 4.1 Design & Architecture
+
+- **Security by Design:**
+  - Integrate security principles from the requirements phase through detailed architectural reviews.
+  - Map out trust boundaries and data flows, especially for WebRTC streams, WebSocket connections, and interactions with the AI and transcription modules.
+
+- **Modular Security Components:**
+  - Develop dedicated modules for authentication, authorization, encryption, and API validation.
+
+### 4.2 Development & Coding
+
+- **Use Secure Frameworks:**
+  - Leverage secure frameworks (e.g., Remix for server-side operations and React for client-side) with built-in security advantages.
+
+- **Coding Best Practices:**
+  - Enforce static analysis and code reviews focusing on security vulnerabilities.
+  - Embed logging that is secure and avoids leaking sensitive information.
+
+- **Input Sanitization:**
+  - Implement comprehensive server-side validation using TypeScript and backend libraries.
+  - Ensure any external data (e.g., media device access, transcription results) is verified and sanitized.
+
+### 4.3 Testing & Validation
+
+- **Automated Testing:**
+  - Use Vitest and Playwright for functional and security testing.
+  - Integrate MSW for simulating API interactions securely.
+
+- **Penetration Testing & Code Reviews:**
+  - Schedule routine penetration tests and security code reviews to identify and remedy potential vulnerabilities.
+  
+- **Dependency Scanning:**
+  - Integrate SCA tools to scan for known vulnerabilities in third-party libraries.
+
+### 4.4 Deployment & Infrastructure
+
+- **Hardened Deployment:**
+  - Deploy Cloudflare Workers and Durable Objects using secure, hardened configurations.
+  - Enforce HTTPS everywhere using TLS 1.2+.
+
+- **Environment Configurations:**
+  - Use environment-specific configurations to prevent testing/debugging features from leaking into production.
+  - Securely manage secrets with dedicated vaults or secure environment variable services.
+
+- **Monitoring & Incident Response:**
+  - Monitor application performance, security metrics, and logs continuously.
+  - Enable proactive incident response procedures and regular security audits.
+
+### 4.5 Post-Deployment
+
+- **Ongoing Maintenance:**
+  - Regularly review and update security controls in response to emerging threats and vulnerabilities.
+
+- **User Feedback & Reporting:**
+  - Provide secure channels for security feedback and bug reporting from users.
+
+---
+
+## 5. Conclusion
+
+Following these guidelines and implementation steps will help ensure that the Orange Meets application remains secure, resilient, and compliant with industry standards. The plan applies layered security controls across all components, emphasizing encryption, input validation, authorization, and secure configuration management. Regular reviews and updates of the security posture are critical to adapt to new threats and maintain optimal protection.
+
+*Note: If any design choices or implementation details raise security concerns, flag them immediately for review and re-assessment.*

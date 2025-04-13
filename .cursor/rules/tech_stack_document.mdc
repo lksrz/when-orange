@@ -1,0 +1,79 @@
+---
+description: Apply these rules when making changes to the project
+globs:
+alwaysApply: true
+---
+
+Update this rule if user requested changes to the project requirement, etc.
+# Orange Meets Tech Stack Document
+
+This document explains the technology choices behind the Orange Meets project in simple, everyday language. Each section below breaks down part of the system, what tools are used, and why they were chosen. Whether you're a seasoned tech professional or a curious non-tech user, this guide will help you understand how the project works together as a whole.
+
+## Frontend Technologies
+
+The frontend is all about what the users see and interact with. Here's how we made it smooth and responsive:
+
+*   **React**: A popular library that helps build interactive user interfaces. It keeps the app dynamic, so UI components update quickly as you interact with them.
+*   **Remix**: A framework that handles routing (navigating different pages) and server-side tasks behind the scenes, making the application fast and efficient.
+*   **TypeScript**: An enhanced version of JavaScript that catches errors early, leading to more reliable and easier-to-maintain code.
+*   **Tailwind CSS**: A styling tool that simplifies the process of designing attractive and responsive layouts. It helps create a modern, clean look without overcomplicating the styling process.
+*   **Radix UI**: A set of pre-made, accessible UI components which ensure consistency in design and make it easier to build interactive parts of the app.
+*   **PartyTracks**: A specialized tool for managing WebRTC connections. It plays a key role in connecting participants in real-time video and audio chats.
+*   **RxJS**: A library that simplifies working with asynchronous data. In simpler terms, it makes sure the app smoothly handles data like live video or chat messages without hiccups.
+*   **React Query**: This helps with managing all data fetching and synchronization between the frontend and backend. It keeps data up-to-date so that users see the latest information in real-time.
+
+## Backend Technologies
+
+The backend is like the engine room: it handles data, logic, and important business rules behind the user interface.
+
+*   **Cloudflare Workers**: A serverless platform where the core of the backend runs. This technology allows us to deploy the application quickly and efficiently without managing traditional servers.
+*   **Cloudflare Durable Objects**: Think of these as the organizers of room states. They manage meeting rooms by keeping track of participants, settings, and even cleaning up inactive rooms automatically.
+*   **Cloudflare Calls**: A specialized tool for managing real-time WebRTC communications (video and audio). It ensures that voice and video calls run smoothly and reliably.
+*   **Drizzle ORM**: This assists in handling databases, specifically tailored for Cloudflare’s D1 database. It makes it easier to read, write, and manage data without complex code.
+*   **Partyserver**: Works in tandem with PartyTracks and Durable Objects to manage the overall state and connections within the meeting room. It ensures that changes like muting or video toggling are properly communicated to everyone in the room.
+
+## Infrastructure and Deployment
+
+Our infrastructure choices ensure that Orange Meets is robust, scalable, and easy to deploy.
+
+*   **Cloudflare Workers and Durable Objects**: Hosting right at the edge means low latency, high speed, and robustness.
+*   **Wrangler CLI**: This command-line tool simplifies the process of deploying the application to Cloudflare, making updates swift and reliable.
+*   **Version Control**: Although not explicitly mentioned, tools like Git are generally used to manage code changes, ensuring that every improvement is tracked and reviewed.
+*   Together, these tools ensure that the project is safe, easily maintainable, and ready for growth as more users join video conferences.
+
+## Third-Party Integrations
+
+To extend functionality beyond core features, additional integrations are included:
+
+*   **OpenAI API (Optional)**: Provides an optional AI assistant to help users during meetings. This assistant can answer queries or provide support with push-to-talk functionality.
+*   **MSW (Mock Service Worker)**: Used during development to simulate server responses for testing, without having to rely on the live backend.
+*   **Vitest and Playwright**: Testing frameworks that ensure everything works as expected. Vitest is used for unit and integration tests, while Playwright is employed for end-to-end tests, so real user journeys are verified.
+
+## Security and Performance Considerations
+
+Building a great experience means making sure the app is both secure and performs well:
+
+*   **Security Measures**:
+
+    *   User permissions are explicitly requested for camera and microphone; this protects user privacy.
+    *   Session cookies and authentication measures ensure that only valid users participate in a meeting.
+    *   Cloudflare's own robust infrastructure provides security at a granular level, protecting against many common online threats.
+
+*   **Performance Optimizations**:
+
+    *   Direct peer-to-peer connections via WebRTC (facilitated by PartyTracks and Cloudflare Calls) help deliver a smooth, low-latency video and audio experience.
+    *   Lightweight styling with Tailwind CSS and fast interactive elements powered by React and Remix contribute to quick loading times and responsiveness.
+    *   The use of modern testing frameworks helps us catch performance issues early, ensuring a consistent, smooth experience for all users.
+
+## Conclusion and Overall Tech Stack Summary
+
+Orange Meets uses a carefully chosen set of modern technologies to deliver a state-of-the-art video conferencing experience:
+
+*   **Frontend:** The team used React, Remix, and TypeScript along with styling tools like Tailwind CSS and Radix UI to create an engaging, intuitive interface. Supporting libraries like PartyTracks, RxJS, and React Query ensure real-time updates and seamless media interactions.
+*   **Backend:** The core logic runs on Cloudflare Workers, using Durable Objects and Cloudflare Calls to manage room states and media communication efficiently. Drizzle ORM and Partyserver bridge the gap between data management and real-time functionality.
+*   **Deployment and Infrastructure:** Hosted on Cloudflare for high speed and scalability, the project uses tooling like Wrangler CLI for deployment and version control systems for code management. These choices ensure rapid, reliable updates.
+*   **Third-Party Services and Testing:** Integration with OpenAI (when enabled) adds an intelligent assistant, while tools such as MSW, Vitest, and Playwright guarantee that each part of the project works correctly and efficiently.
+
+The combination of these thoughtful technology choices not only meets the project’s goals but also paves the way for a robust, scalable, and user-friendly video conferencing experience. With a focus on real-time communication, performance, and security, Orange Meets stands out as a modern solution for dynamic remote interactions.
+
+This concludes our Tech Stack Document for Orange Meets. We hope this breakdown helps you understand the backbone of the project and why each technology was chosen.

@@ -1,0 +1,133 @@
+---
+description: Apply these rules when making changes to the project
+globs:
+alwaysApply: true
+---
+
+Update this rule if user requested changes to the project requirement, etc.
+## Project Overview
+
+*   **Type:** WebRTC Video Conferencing Application
+*   **Description:** Orange Meets is a WebRTC video conferencing application built using Cloudflare technologies. It provides real-time communication with features like screen sharing, mute/unmute, and an optional AI assistant. The project uses a modern tech stack aimed at scalability and ease of deployment.
+*   **Primary Goal:** Enable scalable, real-time video conferencing with integrated features including room management via Cloudflare Durable Objects and an optional AI assistant for enhanced user experience.
+
+## Project Structure
+
+### Framework-Specific Routing
+
+*   **Directory Rules:**
+
+    *   `[Remix latest]`: Routes are structured in the `app/routes` directory, leveraging Remix conventions such as loaders, actions, and nested routing where applicable.
+    *   Example 1: "Remix (Cloudflare Adapter)" → `app/routes/index.jsx` for the landing page
+    *   Example 2: "Remix Route for Room" → `app/routes/room/$roomId.jsx` to capture dynamic room URLs
+
+### Core Directories
+
+*   **Versioned Structure:**
+
+    *   `app/routes`: Contains all the route components defined per Remix file-based routing conventions.
+    *   `app/utils`: Houses shared utilities and helper functions for client-side operations.
+    *   `workers/durable_objects`: Contains Cloudflare Durable Object implementations, e.g., `ChatRoom.js` to manage room state.
+
+### Key Files
+
+*   **Stack-Versioned Patterns:**
+
+    *   `app/root.jsx`: Acts as the root component for Remix, defining the main layout and error boundaries.
+    *   `workers/durable_objects/ChatRoom.js`: Implements the ChatRoom Durable Object extending from Partyserver, including lifecycle hooks such as `onStart`, `onConnect`, `onMessage`, `onClose`, `onError`, and `alarm`.
+
+## Tech Stack Rules
+
+*   **Version Enforcement:**
+
+    *   `react@latest`: Ensure usage of hooks and state management per best practices.
+    *   `remix@latest`: Enforce file-based routing with loaders/actions and maintain a consistent directory structure.
+    *   `typescript@latest`: Implement strict type-checking throughout the project.
+    *   `tailwindcss@latest`: Follow utility-first design and responsive design principles.
+    *   `cloudflare-workers@latest`: Use Wrangler for deployments and adhere to serverless best practices.
+
+## PRD Compliance
+
+*   **Non-Negotiable:**
+
+    *   "Cloudflare Durable Objects must be used for managing room state to ensure real-time synchronization and automatic cleanup." (This requirement influences the backend design and state management strategy.)
+
+## App Flow Integration
+
+*   **Stack-Aligned Flow:**
+
+    *   Landing and Username Setup: Defined in `app/routes/index.jsx` with redirect logic ensuring users set up their username before joining a room.
+    *   Joining a Room: `app/routes/room/$roomId.jsx` handles room joining, permission requests, and initializes WebSocket connections to Durable Objects.
+    *   Durable Object Integration: The `workers/durable_objects/ChatRoom.js` file is utilized for real-time room state management and communication.
+    *   AI Assistant Integration (Optional): Implemented via a dedicated route (e.g., `app/routes/ai.jsx`) and integrated with OpenAI API using push-to-talk functionality.
+
+## Best Practices
+
+*   React
+    *   Use functional components and hooks for state and side-effect management.
+    *   Maintain clear separation of UI components and business logic.
+    *   Emphasize reusability and component-driven design.
+
+*   Remix
+    *   Leverage file-based routing for clarity and maintenance of URL structure.
+    *   Use loaders and actions to handle data fetching and mutations server-side.
+    *   Implement error boundaries to gracefully handle runtime exceptions.
+
+*   TypeScript
+    *   Enforce strict typing to reduce runtime errors and improve code reliability.
+    *   Utilize interfaces and types for prop validation and API responses.
+    *   Integrate with linting tools to maintain code quality.
+
+*   Tailwind CSS
+    *   Follow utility-first principles to streamline styling.
+    *   Use responsive and mobile-first design strategies.
+    *   Optimize for performance by purging unused styles.
+
+*   Cloudflare Workers & Durable Objects
+    *   Structure code for serverless execution and scalability.
+    *   Use Wrangler for deployment and environment configuration.
+    *   Ensure proper state management and isolation in Durable Objects.
+
+*   OpenAI API (Optional AI Assistant)
+    *   Secure API keys and enforce rate limiting.
+    *   Integrate robust error handling for API failures.
+    *   Maintain clear separation between the AI assistant logic and core application functionality.
+
+*   Testing (MSW, Vitest, Playwright)
+    *   Use MSW for API mocking during development and tests.
+    *   Implement unit tests with Vitest for component and utility validation.
+    *   Use Playwright for end-to-end tests ensuring user flows are working as expected.
+
+*   Deployment (Wrangler)
+    *   Automate deployments via Wrangler ensuring compatibility with Cloudflare Workers.
+    *   Maintain environment configurations separate from code.
+    *   Implement continuous integration for deployment validations.
+
+## Rules
+
+*   Derive folder/file patterns **directly** from techStackDoc versions.
+*   For Remix projects: Enforce the use of the `app/routes` directory with nested folder structures for dynamic routing.
+*   For Cloudflare Workers: Use designated directories like `workers/durable_objects` for Durable Object implementations.
+*   Never mix version patterns (e.g., do not combine file structures from Next.js Pages Router in a Remix project).
+
+## Rules Metrics
+
+Before starting the project development, create a metrics file in the root of the project called
+
+`cursor_metrics.md`.
+
+### Instructions:
+
+*   Each time a cursor rule is used as context, update `cursor_metrics.md`.
+
+*   Use the following format for `cursor_metrics.md:`
+
+    # Rules Metrics
+
+    ## Usage
+
+    The number of times each rule is used as context:
+    
+    *   rule-name.mdc: 5
+    *   another-rule.mdc: 2
+    *   ...other rules
