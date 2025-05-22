@@ -51,12 +51,13 @@ function useMid(track?: MediaStreamTrack) {
 
 interface Props {
 	user: User
+	style?: React.CSSProperties
 }
 
 export const Participant = forwardRef<
 	HTMLDivElement,
 	JSX.IntrinsicElements['div'] & Props
->(({ user }, ref) => {
+>(({ user, style, ...props }, ref) => {
 	const { data } = useUserMetadata(user.name)
 	const {
 		traceLink,
@@ -129,8 +130,14 @@ export const Participant = forwardRef<
 
 	return (
 		<div
-			className="grow shrink text-base basis-[calc(var(--flex-container-width)_-_var(--gap)_*_3)]"
+			className={
+				style
+					? 'relative'
+					: 'grow shrink text-base basis-[calc(var(--flex-container-width)_-_var(--gap)_*_3)]'
+			}
 			ref={ref}
+			style={style}
+			{...props}
 		>
 			<Flipped flipId={id + pinned}>
 				<div
