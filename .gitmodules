@@ -1,0 +1,3 @@
+[submodule "node-live-transcription"]
+	path = node-live-transcription
+	url = git@github.com:deepgram-starters/node-live-transcription.git
