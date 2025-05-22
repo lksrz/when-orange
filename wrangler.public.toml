@@ -1,4 +1,4 @@
-name = "orange-meets-public"
+name = "whenmeet-call-public"
 
 account_id = "8477399eb04accc1792af96aeaa25222"
 main = "./build/index.js"

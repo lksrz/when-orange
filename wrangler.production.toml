@@ -1,4 +1,4 @@
-name = "orange-meets-production"
+name = "whenmeet-call-production"
 
 account_id = "8477399eb04accc1792af96aeaa25222"
 main = "./build/index.js"
@@ -28,11 +28,11 @@ TURN_SERVICE_ID = "53fa66872a8636170428abae9b049193"
 EXPERIMENTAL_SIMULCAST_ENABLED = "false"
 
 [[queues.producers]]
- queue = "orange-meets-feedback-queue"
+ queue = "whenmeet-call-feedback-queue"
  binding = "FEEDBACK_QUEUE"
 
 [[queues.consumers]]
- queue = "orange-meets-feedback-queue"
+ queue = "whenmeet-call-feedback-queue"
  # Required: this should match the name of the queue you created in step 3.
  # If you misspell the name, you will receive an error when attempting to publish your Worker.
  max_batch_size = 10 # optional: defaults to 10
@@ -40,7 +40,7 @@ EXPERIMENTAL_SIMULCAST_ENABLED = "false"
 
 [[d1_databases]]
 binding = "DB" # i.e. available in your Worker on env.DB
-database_name = "orange-meets-db-production"
+database_name = "whenmeet-call-db-production"
 database_id = "125a3008-0a8a-4ada-a829-7d2eb2ef15bc"
 
 # Indicate that you want the ChatRoom and RateLimiter classes to be callable as Durable Objects.

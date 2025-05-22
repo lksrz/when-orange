@@ -1,4 +1,4 @@
-name = "orange-meets-e2ee"
+name = "whenmeet-call-e2ee"
 
 account_id = "8477399eb04accc1792af96aeaa25222"
 main = "./build/index.js"

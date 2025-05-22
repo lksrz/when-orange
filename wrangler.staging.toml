@@ -1,4 +1,4 @@
-name = "orange-meets-staging"
+name = "whenmeet-call-staging"
 
 account_id = "8477399eb04accc1792af96aeaa25222"
 main = "./build/index.js"
@@ -28,11 +28,11 @@ TURN_SERVICE_ID = "11cebcf8429b947a48c6894650daa021"
 EXPERIMENTAL_SIMULCAST_ENABLED = "true"
 
 [[queues.producers]]
- queue = "orange-meets-feedback-queue-staging"
+ queue = "whenmeet-call-feedback-queue-staging"
  binding = "FEEDBACK_QUEUE"
 
 [[queues.consumers]]
- queue = "orange-meets-feedback-queue-staging"
+ queue = "whenmeet-call-feedback-queue-staging"
  # Required: this should match the name of the queue you created in step 3.
  # If you misspell the name, you will receive an error when attempting to publish your Worker.
  max_batch_size = 10 # optional: defaults to 10
@@ -40,7 +40,7 @@ EXPERIMENTAL_SIMULCAST_ENABLED = "true"
 
 [[d1_databases]]
 binding = "DB" # i.e. available in your Worker on env.DB
-database_name = "orange-meets-db-staging"
+database_name = "whenmeet-call-db-staging"
 database_id = "e9091e61-7e0a-4719-b9cb-3e1c3e95e9fa"
 
 # Indicate that you want the ChatRoom and RateLimiter classes to be callable as Durable Objects.
