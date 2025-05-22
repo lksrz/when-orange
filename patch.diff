@@ -1,0 +1,21 @@
+--- a/app/durableObjects/ChatRoom.server.ts
++++ b/app/durableObjects/ChatRoom.server.ts
+@@ -652,6 +652,15 @@
+ 						this.broadcastRoomState()
+ 						break
+ 					}
++					case 'enableTranscription': {
++						await this.startTranscription()
++						break
++					}
++					case 'disableTranscription': {
++						await this.stopTranscription()
++						break
++					}
++					case 'audioDataForTranscription': {
++						await this.processAudioForTranscription(data.audioData, data.userId)
++						break
++					}
+ 					default: {
+ 						assertNever(data)
+ 						break

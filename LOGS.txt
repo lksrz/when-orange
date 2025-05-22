@@ -1,0 +1,215 @@
+{
+  "$workers": {
+    "event": {
+      "request": {
+        "cf": {
+          "requestHeaderNames": {},
+          "httpProtocol": "HTTP/2",
+          "tlsCipher": "AEAD-AES128-GCM-SHA256",
+          "continent": "EU",
+          "clientAcceptEncoding": "gzip, deflate, br",
+          "country": "PL",
+          "isEUCountry": "1",
+          "verifiedBotCategory": "",
+          "tlsClientAuth": {
+            "certIssuerDNLegacy": "",
+            "certIssuerSKI": "",
+            "certSubjectDNRFC2253": "",
+            "certSubjectDNLegacy": "",
+            "certFingerprintSHA256": "",
+            "certNotBefore": "",
+            "certSKI": "",
+            "certSerial": "",
+            "certIssuerDN": "",
+            "certVerified": "NONE",
+            "certNotAfter": "",
+            "certSubjectDN": "",
+            "certPresented": "0",
+            "certRevoked": "0",
+            "certIssuerSerial": "",
+            "certIssuerDNRFC2253": "",
+            "certFingerprintSHA1": ""
+          },
+          "requestPriority": "weight=16;exclusive=0;group=0;group-weight=0",
+          "tlsExportedAuthenticator": {
+            "clientFinished": "00fd165fc03de8a3fc83e0b581f72a4466953da67d79d5f78d17d4a182194126",
+            "clientHandshake": "6d431d832eb800ae3bc8f1b8b076bdf01b5b52178ccf2eebda6b2dd3fe2ede26",
+            "serverHandshake": "c652891f816fd206f0159f359d6668a9cea86a9ff26a8d5a3274038d4c762e59",
+            "serverFinished": "d7a93d4999a1910fffc48c320f5b9a7d97b7086e18ac4d22b885ac8194304877"
+          },
+          "tlsVersion": "TLSv1.3",
+          "colo": "WAW",
+          "timezone": "Europe/Warsaw",
+          "city": "Krakow",
+          "region": "Lesser Poland",
+          "tlsClientRandom": "FUBfcZemGPMLtgU2unASmXBHxor5X0X3TMasfcujkn0=",
+          "longitude": "19.93380",
+          "latitude": "50.06370",
+          "postalCode": "31-131",
+          "regionCode": "12",
+          "asOrganization": "Toya sp.z.o.o",
+          "tlsClientExtensionsSha1": "eBrZDr0YocoC2Wfqz/18YVTvEQE=",
+          "tlsClientHelloLength": "508",
+          "clientTcpRtt": 9,
+          "asn": 30782,
+          "edgeRequestKeepAliveStatus": 1
+        },
+        "url": "https://call.whenmeet.me/api/transcription",
+        "method": "GET",
+        "headers": {
+          "accept": "*/*",
+          "accept-encoding": "gzip, br",
+          "accept-language": "en-US,en;q=0.9",
+          "cf-connecting-ip": "130.255.159.215",
+          "cf-ipcountry": "PL",
+          "cf-ray": "918a1ddf6c17c40f",
+          "cf-visitor": "{\"scheme\":\"https\"}",
+          "connection": "Keep-Alive",
+          "cookie": "REDACTED",
+          "host": "call.whenmeet.me",
+          "priority": "u=3, i",
+          "referer": "https://call.whenmeet.me/a1/room",
+          "sec-fetch-dest": "empty",
+          "sec-fetch-mode": "cors",
+          "sec-fetch-site": "same-origin",
+          "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15",
+          "x-forwarded-proto": "https",
+          "x-real-ip": "130.255.159.215"
+        },
+        "path": "/api/transcription"
+      },
+      "rayId": "918a1ddf6c17c40f",
+      "executionModel": "stateless",
+      "response": {
+        "status": 426
+      }
+    },
+    "diagnosticsChannelEvents": [],
+    "truncated": false,
+    "scriptName": "whenmeet-call",
+    "outcome": "ok",
+    "eventType": "fetch",
+    "scriptVersion": {
+      "id": "92b70e6c-349e-43b5-a278-00f10350245d"
+    },
+    "requestId": "918a1ddf6c17c40f",
+    "cpuTimeMs": 1,
+    "wallTimeMs": 6
+  },
+  "level": "info",
+  "message": "GET https://call.whenmeet.me/api/transcription",
+  "$metadata": {
+    "now": "2025-02-27T18:08:17.902Z",
+    "id": "01JN49FSX4TJ9E5KNRDQEWAFTJ",
+    "requestId": "918a1ddf6c17c40f",
+    "service": "whenmeet-call",
+    "message": "GET https://call.whenmeet.me/api/transcription",
+    "account": "9e7cfb40f9896e268a8212dc58e20780",
+    "type": "cf-worker-event",
+    "fingerprint": "43f1446d6716dfb4ff73c764bcb692d6",
+    "origin": "fetch",
+    "messageTemplate": "GET <URL>"
+  }
+}
+{
+  "$workers": {
+    "truncated": false,
+    "event": {
+      "request": {
+        "url": "https://call.whenmeet.me/api/transcription",
+        "method": "GET",
+        "path": "/api/transcription"
+      }
+    },
+    "outcome": "ok",
+    "scriptName": "whenmeet-call",
+    "eventType": "fetch",
+    "executionModel": "stateless",
+    "scriptVersion": {
+      "id": "92b70e6c-349e-43b5-a278-00f10350245d"
+    },
+    "requestId": "918a1ddf6c17c40f"
+  },
+  "message": "Transcription API: Request received",
+  "url": "https://call.whenmeet.me/api/transcription",
+  "headers": {
+    "accept": "*/*",
+    "accept-encoding": "gzip, br",
+    "accept-language": "en-US,en;q=0.9",
+    "cf-connecting-ip": "130.255.159.215",
+    "cf-ipcountry": "PL",
+    "cf-ray": "918a1ddf6c17c40f",
+    "cf-visitor": "{\"scheme\":\"https\"}",
+    "connection": "Keep-Alive",
+    "cookie": "__session=eyJ1c2VybmFtZSI6Imx1a2FzeiJ9.MygyjpxIlVjmE42bycOlGtqunztX7zXCRi4UZfvIYSY",
+    "host": "call.whenmeet.me",
+    "priority": "u=3, i",
+    "referer": "https://call.whenmeet.me/a1/room",
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-origin",
+    "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.3 Safari/605.1.15",
+    "x-forwarded-proto": "https",
+    "x-real-ip": "130.255.159.215"
+  },
+  "method": "GET",
+  "$metadata": {
+    "now": "2025-02-27T18:08:17.902Z",
+    "id": "01JN49FSX7G5RKCCSP0FNJJ5SY",
+    "requestId": "918a1ddf6c17c40f",
+    "service": "whenmeet-call",
+    "message": "Transcription API: Request received",
+    "account": "9e7cfb40f9896e268a8212dc58e20780",
+    "type": "cf-worker",
+    "fingerprint": "4beca24143f57a5c89d3fc336cfdf228",
+    "origin": "fetch"
+  }
+}
+{
+  "$workers": {
+    "truncated": false,
+    "event": {
+      "request": {
+        "url": "https://call.whenmeet.me/api/transcription",
+        "method": "GET",
+        "path": "/api/transcription"
+      }
+    },
+    "outcome": "ok",
+    "scriptName": "whenmeet-call",
+    "eventType": "fetch",
+    "executionModel": "stateless",
+    "scriptVersion": {
+      "id": "92b70e6c-349e-43b5-a278-00f10350245d"
+    },
+    "requestId": "918a1ddf6c17c40f"
+  },
+  "message": "Transcription API: Non-WebSocket request received, returning 426",
+  "$metadata": {
+    "now": "2025-02-27T18:08:17.902Z",
+    "id": "01JN49FSX7G5RKCCSP0FNJJ5SZ",
+    "requestId": "918a1ddf6c17c40f",
+    "service": "whenmeet-call",
+    "message": "Transcription API: Non-WebSocket request received, returning 426",
+    "account": "9e7cfb40f9896e268a8212dc58e20780",
+    "type": "cf-worker",
+    "fingerprint": "79cfe05183fa081a28881670cc3af747",
+    "origin": "fetch",
+    "messageTemplate": "Transcription API: Non-WebSocket request received, returning <NUM>"
+  }
+}
+↗️  Done syncing assets
+Total Upload: 2988.37 KiB / gzip: 601.22 KiB
+Worker Startup Time: 67 ms
+Your worker has access to the following bindings:
+- Durable Objects:
+  - rooms: ChatRoom
+  - transcriptionService: TranscriptionService
+- Vars:
+  - CALLS_APP_ID: "cf0b7d009feba7d66e94027f36d8d382"
+  - TURN_SERVICE_ID: "3d47c5a790a0b730d98bf6ebf0e37553"
+  - DEEPGRAM_ID: "417702fd-5dbd-402e-8516-fd05922c0d46"
+Uploaded whenmeet-call (13.15 sec)
+Deployed whenmeet-call triggers (5.77 sec)
+  call.whenmeet.me (custom domain)
+Current Version ID: 8688a09b-8f93-4b9b-b744-ddc0780a3de3
