@@ -1,68 +1,53 @@
-import { createGrid } from 'good-grid'
-import { useGridDimensions } from 'good-grid/react'
-import { useId, useRef } from 'react'
+import { useId, useMemo } from 'react'
 import { Flipper } from 'react-flip-toolkit'
+import useMeasure from 'react-use/lib/useMeasure'
 import type { User } from '~/types/Messages'
+import { calculateLayout } from '~/utils/calculateLayout'
 import { Participant } from './Participant'
 
-export function ParticipantLayout({
-	users,
-	gap,
-	aspectRatio,
-}: {
-	users: User[]
-	gap: number
-	aspectRatio: string
-}) {
-	const $el = useRef<HTMLDivElement>(null)
-
-	// hook that listens to resize of the element
-	// and returns it's dimensions
-	const dimensions = useGridDimensions($el)
-
-	const { width, height, getPosition } = createGrid({
-		dimensions,
-		count: users.length,
-		aspectRatio,
-		gap,
-	})
-
+export function ParticipantLayout(props: { users: User[] }) {
+	const [containerRef, { width: containerWidth, height: containerHeight }] =
+		useMeasure<HTMLDivElement>()
+	const [firstFlexChildRef, { width: firstFlexChildWidth }] =
+		useMeasure<HTMLDivElement>()
+	const flexContainerWidth = useMemo(
+		() =>
+			100 /
+				calculateLayout({
+					count: props.users.length,
+					height: containerHeight,
+					width: containerWidth,
+				}).cols +
+			'%',
+		[containerHeight, containerWidth, props.users.length]
+	)
 	const id = useId()
 
-	if (users.length === 0) {
+	if (props.users.length === 0) {
 		return null
 	}
 
 	return (
-		<Flipper flipKey={id + users.length}>
+		<Flipper flipKey={id + props.users.length}>
 			<div
-				className="absolute inset-[--gap] h-[--height] w-[--width] isolate flex flex-wrap justify-around"
-				ref={$el}
+				className="absolute inset-0 h-full w-full isolate flex flex-wrap justify-around gap-[--gap]"
 				style={
 					{
-						'--gap': '-' + gap + 'px',
-						height: `calc(100% + ${gap}px + ${gap}px`,
-						width: `calc(100% + ${gap}px + ${gap}px`,
+						// the flex basis that is needed to achieve row layout
+						'--flex-container-width': flexContainerWidth,
+						// the size of the first user's flex container
+						'--participant-max-width': firstFlexChildWidth + 'px',
 					} as any
 				}
+				ref={containerRef}
 			>
-				{users.map((user, i) => {
-					const { top, left } = getPosition(i)
-					return (
-						<Participant
-							style={{
-								width,
-								height,
-								top,
-								left,
-								position: 'absolute',
-								transition: '0.4s all',
-							}}
-							key={user.id}
-							user={user}
-						/>
-					)
-				})}
+				{props.users.map((user, i) => (
+					<Participant
+						key={user.id}
+						user={user}
+						ref={i === 0 ? firstFlexChildRef : undefined}
+					/>
+				))}
 			</div>
 		</Flipper>
 	)

@@ -20,7 +20,6 @@ const UserListItem: FC<{
 }> = ({ user, audioTrack }) => {
 	const { traceLink } = useRoomContext()
 	const { data } = useUserMetadata(user.name)
-
 	return (
 		<li className="flex items-center gap-4 text-base h-9">
 			<div className="mr-auto overflow-hidden whitespace-nowrap text-ellipsis">
@@ -32,16 +31,8 @@ const UserListItem: FC<{
 					}
 					target="_blank"
 					rel="noopener noreferrer"
-					className="flex items-center gap-3"
 				>
-					{data?.photob64 && (
-						<img
-							className="rounded-full h-6"
-							src={`data:image/png;base64,${data.photob64}`}
-							alt={data.displayName}
-						/>
-					)}
-					<span>{data?.displayName}</span>
+					{data?.displayName}
 				</OptionalLink>
 			</div>
 			{audioTrack && user.tracks.audioEnabled && (
@@ -82,7 +73,8 @@ export const ParticipantsButton: FC<
 		<ParticipantsDialog {...rest}>
 			<Tooltip content={participantCount(otherUsers.length + 1)}>
 				<Trigger asChild>
-					<Button className={cn('relative', className)} displayType="secondary">
+					<Button className="flex items-center gap-2 text-xs" displayType="secondary">
+						<span className="hidden lg:inline">Participants</span>
 						<Icon type="userGroup" />
 					</Button>
 				</Trigger>
@@ -99,16 +91,6 @@ export const ParticipantsDialog: FC<ParticipantDialogProps> = ({
 	onOpenChange,
 }) => {
 	const { userMedia } = useRoomContext()
-	const allParticipants = [identity, ...otherUsers]
-		.filter((x): x is User => x !== undefined)
-		.sort((a, b) => {
-			const nameA = a.name.toLowerCase()
-			const nameB = b.name.toLowerCase()
-
-			if (nameA < nameB) return -1
-			if (nameA > nameB) return 1
-			return 0
-		})
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			{children}
@@ -121,19 +103,17 @@ export const ParticipantsDialog: FC<ParticipantDialogProps> = ({
 							{participantCount(otherUsers.length + 1)}
 						</h2>
 						<ul className="space-y-2">
-							{allParticipants.map((p) =>
-								p === identity ? (
-									<UserListItem
-										user={identity}
-										audioTrack={userMedia.audioStreamTrack}
-										key={identity.id}
-									>
-										{identity.name}
-									</UserListItem>
-								) : (
-									<OtherUser user={p} key={p.id} />
-								)
+							{identity && (
+								<UserListItem
+									user={identity}
+									audioTrack={userMedia.audioStreamTrack}
+								>
+									{identity.name}
+								</UserListItem>
 							)}
+							{otherUsers.map((u) => (
+								<OtherUser user={u} key={u.id} />
+							))}
 						</ul>
 					</div>
 				</DialogContent>

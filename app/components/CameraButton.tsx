@@ -1,4 +1,3 @@
-import { VisuallyHidden } from '@radix-ui/react-visually-hidden'
 import type { FC } from 'react'
 import { useKey } from 'react-use'
 import { useRoomContext } from '~/hooks/useRoomContext'
@@ -11,8 +10,6 @@ import { Tooltip } from './Tooltip'
 
 export const CameraButton: FC<ButtonProps> = ({ onClick, ...rest }) => {
 	const {
-		audioOnlyMode,
-		setAudioOnlyMode,
 		userMedia: {
 			turnCameraOff,
 			turnCameraOn,
@@ -48,17 +45,18 @@ export const CameraButton: FC<ButtonProps> = ({ onClick, ...rest }) => {
 				displayType={videoEnabled ? 'secondary' : 'danger'}
 				disabled={!!videoUnavailableMessage}
 				onClick={(e) => {
-					if (audioOnlyMode) {
-						setAudioOnlyMode(false)
-					}
 					toggle()
 					onClick && onClick(e)
 				}}
 				{...rest}
+				className="flex items-center gap-2 text-xs"
 			>
-				<VisuallyHidden>
-					{videoEnabled ? 'Turn camera off' : 'Turn camera on'}
-				</VisuallyHidden>
+				<span className="hidden md:inline lg:hidden">
+					{videoEnabled ? 'Cam off' : 'Cam on'}
+				</span>
+				<span className="hidden lg:inline">
+					{videoEnabled ? 'Camera off' : 'Camera on'}
+				</span>
 				<Icon type={videoEnabled ? 'videoOn' : 'videoOff'} />
 			</Button>
 		</Tooltip>

@@ -6,13 +6,18 @@ import { cn } from '~/utils/style'
 const displayTypeMap = {
 	primary: [
 		'text-white',
-		'bg-orange-500 hover:bg-orange-600 active:bg-orange-700 active:bg-orange-800',
-		'border-orange-500 hover:border-orange-600 active:border-orange-700 active:border-orange-800',
+		'bg-blue-600 hover:bg-blue-700 active:bg-blue-800 focus:ring-blue-500 disabled:bg-blue-300',
+		'border-blue-600 hover:border-blue-700 active:border-blue-800',
 	],
 	secondary: [
 		'text-zinc-900 dark:text-zinc-100',
 		'bg-zinc-200 hover:bg-zinc-300 dark:bg-zinc-700 dark:hover:bg-zinc-600 active:bg-zinc-400 dark:active:bg-zinc-700',
 		'border-zinc-200 hover:border-zinc-300 dark:border-zinc-700 dark:hover:border-zinc-600',
+	],
+	orange: [
+		'text-white',
+		'bg-orange-500 hover:bg-orange-600 active:bg-orange-700',
+		'border-orange-500 hover:border-orange-600 active:border-orange-700',
 	],
 	ghost: [
 		'text-white hover:text-zinc-900',
@@ -24,6 +29,11 @@ const displayTypeMap = {
 		'bg-red-600 hover:bg-red-700 active:bg-red-800',
 		'border-red-600 hover:border-red-700 active:border-red-800',
 	],
+	action: [
+		'text-white',
+		'bg-green-600 hover:bg-green-700 active:bg-green-800 focus:ring-green-500 disabled:bg-green-300',
+		'border-green-600 hover:border-green-700 active:border-green-800',
+	],
 }
 
 export type ButtonProps = Omit<JSX.IntrinsicElements['button'], 'ref'> & {
@@ -31,16 +41,12 @@ export type ButtonProps = Omit<JSX.IntrinsicElements['button'], 'ref'> & {
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
-	({ className, displayType = 'primary', disabled, onClick, ...rest }, ref) => (
+	({ className, displayType = 'action', disabled, onClick, ...rest }, ref) => (
 		<button
 			className={cn(
-				'border-4',
-				'rounded',
+				'w-full flex py-2 justify-center px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2',
 				'uppercase',
-				'font-bold',
-				'tracking-widest',
-				'py-[.5em] px-[1em]',
-				disabled && 'cursor-not-allowed opacity-60',
+				disabled && 'cursor-not-allowed opacity-50',
 				displayTypeMap[displayType].join(' '),
 				className
 			)}

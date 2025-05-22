@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat:*)",
+      "Bash(cd:*)",
+      "Bash(echo:*)",
+      "Bash(find:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git stash:*)",
+      "Bash(grep:*)",
+      "Bash(head:*)",
+      "Bash(ls:*)",
+      "Bash(npm list:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npm run:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(npx prettier:*)",
+      "Bash(prettier:*)",
+      "Bash(sed:*)",
+      "Bash(tail:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ],
+    "deny": []
+  }
+}

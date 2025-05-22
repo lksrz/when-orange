@@ -25,9 +25,13 @@ interface SettingsDialogProps {
 export const SettingsButton = () => {
 	return (
 		<SettingsDialog>
-			<Tooltip content="Settings">
+			<Tooltip content="Camera and microphone settings">
 				<Trigger asChild>
-					<Button className="text-sm" displayType="secondary">
+					<Button
+						displayType="secondary"
+						className="flex items-center gap-2 text-xs"
+					>
+						<span className="hidden md:inline">Settings</span>
 						<Icon type="cog" />
 					</Button>
 				</Trigger>

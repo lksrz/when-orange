@@ -13,7 +13,7 @@ export const AudioIndicator: FC<AudioIndicatorProps> = ({ audioTrack }) => {
 	return (
 		<div className="relative">
 			<div
-				className={'h-4 w-4 rounded-full bg-orange-400 scale-[--scale]'}
+				className={'h-4 w-4 rounded-full bg-green-400 scale-[--scale]'}
 				style={
 					{
 						'--scale': Math.max(minSize, audioLevel + scaleModifier),
@@ -22,7 +22,7 @@ export const AudioIndicator: FC<AudioIndicatorProps> = ({ audioTrack }) => {
 			></div>
 			<div
 				className={
-					'h-2 w-2 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-orange-200 scale-[--scale]'
+					'h-2 w-2 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-green-200 scale-[--scale]'
 				}
 				style={
 					{

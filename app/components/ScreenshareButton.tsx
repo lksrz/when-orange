@@ -1,16 +1,19 @@
-import { VisuallyHidden } from '@radix-ui/react-visually-hidden'
 import type { FC } from 'react'
 import { useEffect, useState } from 'react'
 import { useRoomContext } from '~/hooks/useRoomContext'
 import { Button } from './Button'
 import { Icon } from './Icon/Icon'
+import { Tooltip } from './Tooltip'
 
 interface ScreenshareButtonProps {}
 
 export const ScreenshareButton: FC<ScreenshareButtonProps> = () => {
 	const {
 		userMedia: { screenShareVideoTrack, startScreenShare, endScreenShare },
+		room: { otherUsers },
 	} = useRoomContext()
+
+	const otherUserIsSharing = otherUsers.some((u) => u.tracks.screenshare)
 
 	const sharing = screenShareVideoTrack !== undefined
 
@@ -30,12 +33,29 @@ export const ScreenshareButton: FC<ScreenshareButtonProps> = () => {
 	if (!canShareScreen) return null
 
 	return (
-		<Button
-			displayType={sharing ? 'danger' : 'secondary'}
-			onClick={sharing ? endScreenShare : startScreenShare}
+		<Tooltip
+			content={
+				otherUserIsSharing
+					? 'Someone else is sharing'
+					: sharing
+						? 'Stop sharing'
+						: 'Share screen'
+			}
 		>
-			<VisuallyHidden>Share screen</VisuallyHidden>
-			<Icon type="screenshare" />
-		</Button>
+			<Button
+				displayType={sharing ? 'danger' : 'secondary'}
+				disabled={otherUserIsSharing}
+				onClick={sharing ? endScreenShare : startScreenShare}
+				className="flex items-center gap-2 text-xs"
+			>
+				<span className="hidden md:inline lg:hidden">
+					{sharing ? 'Stop' : 'Share'}
+				</span>
+				<span className="hidden lg:inline">
+					{sharing ? 'Stop sharing' : 'Share screen'}
+				</span>
+				<Icon type="screenshare" />
+			</Button>
+		</Tooltip>
 	)
 }

@@ -7,16 +7,7 @@ export const Input = forwardRef<
 >(({ className, ...rest }, ref) => (
 	<input
 		className={cn(
-			'w-full',
-			'rounded',
-			'border-2',
-			'border-zinc-500',
-			'text-zinc-900',
-			'dark:text-zinc-50',
-			'bg-zinc-50',
-			'dark:bg-zinc-700',
-			'px-2',
-			'py-1',
+			'mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500',
 			className
 		)}
 		{...rest}

@@ -1,6 +1,6 @@
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden'
 import { useObservableAsValue } from 'partytracks/react'
-import { forwardRef, useMemo, useRef } from 'react'
+import { forwardRef, useEffect, useMemo, useRef } from 'react'
 import { Flipped } from 'react-flip-toolkit'
 import { combineLatest, fromEvent, map, of, switchMap } from 'rxjs'
 import { useDeadPulledTrackMonitor } from '~/hooks/useDeadPulledTrackMonitor'
@@ -18,7 +18,6 @@ import { cn } from '~/utils/style'
 import { usePulledVideoTrack } from '../hooks/usePulledVideoTrack'
 import { AudioGlow } from './AudioGlow'
 import { AudioIndicator } from './AudioIndicator'
-import { Button } from './Button'
 import {
 	ConnectionIndicator,
 	getConnectionQuality,
@@ -28,7 +27,6 @@ import { Icon } from './Icon/Icon'
 import { MuteUserButton } from './MuteUserButton'
 import { OptionalLink } from './OptionalLink'
 import { usePulledAudioTrack } from './PullAudioTracks'
-import { Spinner } from './Spinner'
 import { Tooltip } from './Tooltip'
 import { VideoSrcObject } from './VideoSrcObject'
 
@@ -58,14 +56,12 @@ interface Props {
 export const Participant = forwardRef<
 	HTMLDivElement,
 	JSX.IntrinsicElements['div'] & Props
->(({ user, style }, ref) => {
+>(({ user }, ref) => {
 	const { data } = useUserMetadata(user.name)
 	const {
 		traceLink,
 		partyTracks,
 		dataSaverMode,
-		simulcastEnabled,
-		audioOnlyMode,
 		pinnedTileIds,
 		setPinnedTileIds,
 		showDebugInfo,
@@ -83,16 +79,8 @@ export const Participant = forwardRef<
 	const pulledAudioTrack = usePulledAudioTrack(
 		isScreenShare ? undefined : user.tracks.audio
 	)
-	const shouldPullVideo = isScreenShare || (!isSelf && !audioOnlyMode)
-	let preferredRid: string | undefined = undefined
-	if (!isScreenShare && simulcastEnabled) {
-		// If datasaver mode is off, we want server-side bandwidth estimation and switching
-		// so we will specify empty string to indicate we have no preferredRid
-		preferredRid = dataSaverMode ? 'b' : ''
-	}
 	const pulledVideoTrack = usePulledVideoTrack(
-		shouldPullVideo ? user.tracks.video : undefined,
-		preferredRid
+		isScreenShare || (!isSelf && !dataSaverMode) ? user.tracks.video : undefined
 	)
 	const audioTrack = isSelf ? userMedia.audioStreamTrack : pulledAudioTrack
 	const videoTrack =
@@ -100,7 +88,7 @@ export const Participant = forwardRef<
 
 	useDeadPulledTrackMonitor(
 		user.tracks.video,
-		identity?.transceiverSessionId,
+		user.transceiverSessionId,
 		!!user.tracks.video,
 		videoTrack,
 		user.name
@@ -108,13 +96,19 @@ export const Participant = forwardRef<
 
 	useDeadPulledTrackMonitor(
 		user.tracks.audio,
-		identity?.transceiverSessionId,
+		user.transceiverSessionId,
 		!!user.tracks.audio,
 		audioTrack,
 		user.name
 	)
 
 	const pinned = pinnedTileIds.includes(id)
+
+	useEffect(() => {
+		if (isScreenShare) {
+			setPinnedTileIds((ids) => [...ids, id])
+		}
+	}, [id, isScreenShare, setPinnedTileIds])
 
 	const packetLoss$ = useMemo(
 		() =>
@@ -137,7 +131,6 @@ export const Participant = forwardRef<
 		<div
 			className="grow shrink text-base basis-[calc(var(--flex-container-width)_-_var(--gap)_*_3)]"
 			ref={ref}
-			style={style}
 		>
 			<Flipped flipId={id + pinned}>
 				<div
@@ -146,10 +139,10 @@ export const Participant = forwardRef<
 						'relative max-w-[--participant-max-width] rounded-xl'
 					)}
 				>
-					{!isScreenShare && !user.tracks.videoEnabled && (
+					{!isScreenShare && (
 						<div
 							className={cn(
-								'absolute inset-0 h-full w-full grid place-items-center'
+								'absolute inset-0 h-full w-full grid place-items-center bg-gray-200'
 							)}
 						>
 							<div className="h-[2em] w-[2em] grid place-items-center text-4xl md:text-6xl 2xl:text-8xl relative">
@@ -188,44 +181,40 @@ export const Participant = forwardRef<
 						className={cn(
 							'absolute inset-0 h-full w-full object-contain opacity-0 transition-opacity',
 							isSelf && !isScreenShare && '-scale-x-100',
-							!isScreenShare && 'object-cover',
 							{
 								'opacity-100': isScreenShare
 									? user.tracks.screenShareEnabled
-									: user.tracks.videoEnabled && (!audioOnlyMode || isSelf),
+									: user.tracks.videoEnabled && (!dataSaverMode || isSelf),
 							},
 							isSelf && isScreenShare && 'opacity-75'
 						)}
 						videoTrack={videoTrack}
 					/>
-					{shouldPullVideo && !pulledVideoTrack && (
-						<div className="absolute inset-0 grid w-full h-full place-items-center">
-							<Spinner className="h-8 w-8" />
-						</div>
+					{false && !isScreenShare && (
+						<HoverFade className="absolute inset-0 grid w-full h-full place-items-center">
+							<div className="flex gap-2 p-2 rounded bg-zinc-900/30">
+								{/* <Tooltip content={pinned ? 'Restore' : 'Maximize'}> */}
+								{/* 	<Button */}
+								{/* 		onClick={() => */}
+								{/* 			setPinnedTileIds((ids) => */}
+								{/* 				pinned ? ids.filter((i) => i !== id) : [...ids, id] */}
+								{/* 			) */}
+								{/* 		} */}
+								{/* 		displayType="ghost" */}
+								{/* 	> */}
+								{/* 		<Icon type={pinned ? 'arrowsIn' : 'arrowsOut'} /> */}
+								{/* 	</Button> */}
+								{/* </Tooltip> */}
+								{!isScreenShare && (
+									<MuteUserButton
+										displayType="ghost"
+										mutedDisplayType="ghost"
+										user={user}
+									/>
+								)}
+							</div>
+						</HoverFade>
 					)}
-					<HoverFade className="absolute inset-0 grid w-full h-full place-items-center">
-						<div className="flex gap-2 p-2 rounded bg-zinc-900/30">
-							<Tooltip content={pinned ? 'Restore' : 'Maximize'}>
-								<Button
-									onClick={() =>
-										setPinnedTileIds((ids) =>
-											pinned ? ids.filter((i) => i !== id) : [...ids, id]
-										)
-									}
-									displayType="ghost"
-								>
-									<Icon type={pinned ? 'arrowsIn' : 'arrowsOut'} />
-								</Button>
-							</Tooltip>
-							{!isScreenShare && (
-								<MuteUserButton
-									displayType="ghost"
-									mutedDisplayType="ghost"
-									user={user}
-								/>
-							)}
-						</div>
-					</HoverFade>
 					{audioTrack && !isScreenShare && (
 						<div className="absolute left-4 top-4">
 							{user.tracks.audioEnabled &&
@@ -234,7 +223,7 @@ export const Participant = forwardRef<
 
 							{!user.tracks.audioEnabled && !user.tracks.audioUnavailable && (
 								<Tooltip content="Mic is turned off">
-									<div className="indication-shadow">
+									<div className="text-red-500 flex items-center gap-2">
 										<Icon type="micOff" />
 										<VisuallyHidden>Mic is muted</VisuallyHidden>
 									</div>
@@ -242,9 +231,9 @@ export const Participant = forwardRef<
 							)}
 							{user.tracks.audioUnavailable && (
 								<Tooltip content="Mic is unavailable. User cannot unmute.">
-									<div className="indication-shadow">
-										<Icon type="micOff" className="text-red-400" />
-										<VisuallyHidden>Mic is muted</VisuallyHidden>
+									<div className="text-red-500 flex items-center gap-2">
+										<Icon type="micOff" />
+										<span>Mic is unavailable</span>
 									</div>
 								</Tooltip>
 							)}
@@ -254,7 +243,7 @@ export const Participant = forwardRef<
 						<div className="flex items-center gap-2 absolute m-2 text-shadow left-1 bottom-1">
 							<ConnectionIndicator quality={getConnectionQuality(packetLoss)} />
 							<OptionalLink
-								className="leading-none text-sm"
+								className="leading-none"
 								href={populateTraceLink(user.transceiverSessionId, traceLink)}
 								target="_blank"
 								rel="noopener noreferrer"
@@ -267,9 +256,6 @@ export const Participant = forwardRef<
 											audioMid && `audio mid: ${audioMid}`,
 											videoMid && `video mid: ${videoMid}`,
 											`vid size: ${videoWidth}x${videoHeight}`,
-											!isSelf &&
-												preferredRid &&
-												`preferredRid: ${preferredRid}`,
 										]
 											.filter(Boolean)
 											.join(' ')}
@@ -283,7 +269,7 @@ export const Participant = forwardRef<
 							<Tooltip content="Hand is raised">
 								<div className="relative">
 									<div className="relative">
-										<Icon className="indication-shadow" type="handRaised" />
+										<Icon className="text-orange-500" type="handRaised" />
 										<Icon
 											className="absolute top-0 left-0 text-orange-300 animate-ping"
 											type="handRaised"
@@ -297,7 +283,7 @@ export const Participant = forwardRef<
 					{(isSpeaking || user.raisedHand) && !isScreenShare && (
 						<div
 							className={cn(
-								'pointer-events-none absolute inset-0 h-full w-full border-4 border-orange-400',
+								'pointer-events-none absolute inset-0 h-full w-full border-4 border-gray-400',
 								!pinned && 'rounded-xl'
 							)}
 						></div>

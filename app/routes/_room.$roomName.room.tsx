@@ -6,10 +6,10 @@ import {
 	useParams,
 	useSearchParams,
 } from '@remix-run/react'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useMount, useWindowSize } from 'react-use'
+import invariant from 'tiny-invariant'
 import { AiButton } from '~/components/AiButton'
-import { ButtonLink } from '~/components/Button'
 import { CameraButton } from '~/components/CameraButton'
 import { CopyButton } from '~/components/CopyButton'
 import { HighPacketLossWarningsToast } from '~/components/HighPacketLossWarningsToast'
@@ -18,12 +18,10 @@ import { LeaveRoomButton } from '~/components/LeaveRoomButton'
 import { MicButton } from '~/components/MicButton'
 import { OverflowMenu } from '~/components/OverflowMenu'
 import { ParticipantLayout } from '~/components/ParticipantLayout'
-import { ParticipantsButton } from '~/components/ParticipantsMenu'
 import { PullAudioTracks } from '~/components/PullAudioTracks'
 import { RaiseHandButton } from '~/components/RaiseHandButton'
-import { SafetyNumberToast } from '~/components/SafetyNumberToast'
 import { ScreenshareButton } from '~/components/ScreenshareButton'
-import Toast, { useDispatchToast } from '~/components/Toast'
+import Toast from '~/components/Toast'
 import useBroadcastStatus from '~/hooks/useBroadcastStatus'
 import useIsSpeaking from '~/hooks/useIsSpeaking'
 import { useRoomContext } from '~/hooks/useRoomContext'
@@ -31,9 +29,10 @@ import { useShowDebugInfoShortcut } from '~/hooks/useShowDebugInfoShortcut'
 import useSounds from '~/hooks/useSounds'
 import useStageManager from '~/hooks/useStageManager'
 import { useUserJoinLeaveToasts } from '~/hooks/useUserJoinLeaveToasts'
-import { dashboardLogsLink } from '~/utils/dashboardLogsLink'
 import getUsername from '~/utils/getUsername.server'
 import isNonNullable from '~/utils/isNonNullable'
+import { TranscriptionService } from "~/components/TranscriptionService";
+import { TranscriptionPanel } from "~/components/TranscriptionPanel";
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 	const username = await getUsername(request)
@@ -50,14 +49,14 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 		hasAiCredentials: Boolean(
 			context.env.OPENAI_API_TOKEN && context.env.OPENAI_MODEL_ENDPOINT
 		),
-		dashboardDebugLogsBaseUrl: context.env.DASHBOARD_WORKER_URL,
 	})
 }
 
 export default function Room() {
 	const { joined } = useRoomContext()
 	const navigate = useNavigate()
-	const { roomName } = useParams()
+	const { roomName } = useParams<{ roomName: string }>()
+	invariant(roomName, 'roomName is required')
 	const { mode, bugReportsEnabled } = useLoaderData<typeof loader>()
 	const [search] = useSearchParams()
 
@@ -70,37 +69,32 @@ export default function Room() {
 
 	return (
 		<Toast.Provider>
-			<JoinedRoom bugReportsEnabled={bugReportsEnabled} />
+			<JoinedRoom bugReportsEnabled={bugReportsEnabled} roomName={roomName} />
 		</Toast.Provider>
 	)
 }
 
-function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
-	const { hasDb, hasAiCredentials, dashboardDebugLogsBaseUrl } =
-		useLoaderData<typeof loader>()
+function JoinedRoom({
+	bugReportsEnabled,
+	roomName,
+}: {
+	bugReportsEnabled: boolean
+	roomName: string
+}) {
+	const { hasDb, hasAiCredentials } = useLoaderData<typeof loader>()
 	const {
 		userMedia,
 		partyTracks,
 		pushedTracks,
 		showDebugInfo,
 		pinnedTileIds,
-		room,
-		e2eeSafetyNumber,
-		e2eeOnJoin,
+		room: {
+			otherUsers,
+			websocket,
+			identity,
+			roomState: { meetingId },
+		},
 	} = useRoomContext()
-	const {
-		otherUsers,
-		websocket,
-		identity,
-		roomState: { meetingId },
-	} = room
-
-	// only want this evaluated once upon mounting
-	const [firstUser] = useState(otherUsers.length === 0)
-
-	useEffect(() => {
-		e2eeOnJoin(firstUser)
-	}, [e2eeOnJoin, firstUser])
 
 	useShowDebugInfoShortcut()
 
@@ -115,7 +109,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 
 	useBroadcastStatus({
 		userMedia,
-		partyTracks,
+		partyTracks: partyTracks,
 		websocket,
 		identity,
 		pushedTracks,
@@ -131,7 +125,7 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 	const someScreenshare =
 		otherUsers.some((u) => u.tracks.screenshare) ||
 		Boolean(identity?.tracks.screenshare)
-	const stageLimit = width < 600 ? 2 : someScreenshare ? 5 : 9
+	const stageLimit = width < 600 ? 2 : someScreenshare ? 5 : 8
 
 	const { recordActivity, actorsOnStage } = useStageManager(
 		otherUsers,
@@ -150,48 +144,49 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 		(u) => !pinnedTileIds.includes(u.id)
 	)
 
-	const gridGap = 12
-	const dispatchToast = useDispatchToast()
+	const [transcriptions, setTranscriptions] = useState<Transcription[]>([])
 
-	useEffect(() => {
-		if (e2eeSafetyNumber) {
-			dispatchToast(
-				<SafetyNumberToast safetyNumber={e2eeSafetyNumber.slice(0, 8)} />,
-				{ duration: Infinity, id: 'e2ee-safety-number' }
-			)
-		}
-	}, [e2eeSafetyNumber, dispatchToast])
+	const isTranscriptionHost = useMemo(() => {
+		const sortedUsers = [...otherUsers].sort((a, b) =>
+			new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime()
+		)
+		return sortedUsers[0]?.id === identity?.id
+	}, [otherUsers, identity])
+
+	const allRemoteAudioTracks = useMemo(() => {
+		return otherUsers
+			.filter((u) => u.id !== identity?.id)
+			.flatMap((u) => u.tracks.audio)
+	}, [otherUsers, identity])
+
+	const [showTranscription, setShowTranscription] = useState(false)
 
 	return (
 		<PullAudioTracks
 			audioTracks={otherUsers.map((u) => u.tracks.audio).filter(isNonNullable)}
 		>
-			<div className="flex flex-col h-full bg-white dark:bg-zinc-800">
-				<div className="relative flex-grow bg-black isolate">
+			<div className="h-[100vh] flex flex-col bg-white">
+				<div className="relative flex-1 min-h-0">
 					<div
-						style={{ '--gap': gridGap + 'px' } as any}
-						className="absolute inset-0 flex isolate p-[--gap] gap-[--gap]"
+						className="absolute inset-0 flex isolate gap-[var(--gap)] p-2 sm:p-[var(--gap)]"
+						style={
+							{
+								'--gap': '1rem',
+							} as any
+						}
 					>
 						{pinnedActors.length > 0 && (
 							<div className="flex-grow-[5] overflow-hidden relative">
-								<ParticipantLayout
-									users={pinnedActors.filter(isNonNullable)}
-									gap={gridGap}
-									aspectRatio="16:9"
-								/>
+								<ParticipantLayout users={pinnedActors.filter(isNonNullable)} />
 							</div>
 						)}
 						<div className="flex-grow overflow-hidden relative">
-							<ParticipantLayout
-								users={unpinnedActors.filter(isNonNullable)}
-								gap={gridGap}
-								aspectRatio="4:3"
-							/>
+							<ParticipantLayout users={unpinnedActors.filter(isNonNullable)} />
 						</div>
 					</div>
 					<Toast.Viewport className="absolute bottom-0 right-0" />
 				</div>
-				<div className="flex flex-wrap items-center justify-center gap-2 p-2 text-sm md:gap-4 md:p-5 md:text-base">
+				<div className="flex pt-0 sm:pt-0 gap-1 sm:gap-4 text-sm p-2 sm:p-4 ">
 					{hasAiCredentials && <AiButton recordActivity={recordActivity} />}
 					<MicButton warnWhenSpeakingWhileMuted />
 					<CameraButton />
@@ -200,42 +195,30 @@ function JoinedRoom({ bugReportsEnabled }: { bugReportsEnabled: boolean }) {
 						raisedHand={raisedHand}
 						onClick={() => setRaisedHand(!raisedHand)}
 					/>
-					<ParticipantsButton
-						identity={identity}
-						otherUsers={otherUsers}
-						className="hidden md:block"
-					></ParticipantsButton>
 					<OverflowMenu bugReportsEnabled={bugReportsEnabled} />
-					<LeaveRoomButton
-						navigateToFeedbackPage={hasDb}
-						meetingId={meetingId}
-					/>
+					<LeaveRoomButton roomName={roomName} />
 					{showDebugInfo && meetingId && (
 						<CopyButton contentValue={meetingId}>Meeting Id</CopyButton>
-					)}
-					{showDebugInfo && meetingId && dashboardDebugLogsBaseUrl && (
-						<ButtonLink
-							className="text-xs"
-							displayType="secondary"
-							to={dashboardLogsLink(dashboardDebugLogsBaseUrl, [
-								{
-									id: '2',
-									key: 'meetingId',
-									type: 'string',
-									value: meetingId,
-									operation: 'eq',
-								},
-							])}
-							target="_blank"
-							rel="noreferrer"
-						>
-							Meeting Logs
-						</ButtonLink>
 					)}
 				</div>
 			</div>
 			<HighPacketLossWarningsToast />
 			<IceDisconnectedToast />
+			{isTranscriptionHost && (
+				<TranscriptionService
+					audioTracks={allRemoteAudioTracks}
+					isActive={isTranscriptionHost}
+					onTranscription={(t) =>
+						setTranscriptions((prev) => [...prev, t])
+					}
+				/>
+			)}
+			<button onClick={() => setShowTranscription((v) => !v)}>
+				{showTranscription ? "Hide" : "Show"} Transcription
+			</button>
+			{showTranscription && (
+				<TranscriptionPanel transcriptions={transcriptions} />
+			)}
 		</PullAudioTracks>
 	)
 }

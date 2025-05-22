@@ -19,10 +19,6 @@ export const OverflowMenu: FC<OverflowMenuProps> = ({ bugReportsEnabled }) => {
 		room: { otherUsers, identity },
 		dataSaverMode,
 		setDataSaverMode,
-		audioOnlyMode,
-		setAudioOnlyMode,
-		simulcastEnabled,
-		userMedia: { turnCameraOff },
 	} = useRoomContext()
 	const [settingsMenuOpen, setSettingMenuOpen] = useState(false)
 	const [bugReportMenuOpen, setBugReportMenuOpen] = useState(false)
@@ -32,35 +28,24 @@ export const OverflowMenu: FC<OverflowMenuProps> = ({ bugReportsEnabled }) => {
 		<>
 			<DropdownMenu.Root>
 				<DropdownMenu.Trigger asChild>
-					<Button displayType="secondary">
-						<VisuallyHidden>More options</VisuallyHidden>
-						<Icon type="EllipsisVerticalIcon" />
+					<Button displayType="secondary" className="flex items-center gap-2 text-xs">
+						<span className="hidden md:inline">Options</span>
+						<Icon type="cog" />
 					</Button>
 				</DropdownMenu.Trigger>
 				<DropdownMenu.Portal>
 					<DropdownMenu.Content sideOffset={5}>
-						{simulcastEnabled && (
-							<DropdownMenu.Item
-								onSelect={() => setDataSaverMode(!dataSaverMode)}
-							>
-								<Icon type="WifiIcon" className="mr-2" />
-								{dataSaverMode ? 'Disable Data Saver' : 'Enable Data Saver'}
-							</DropdownMenu.Item>
-						)}
 						<DropdownMenu.Item
-							onSelect={() => {
-								setAudioOnlyMode(!audioOnlyMode)
-								turnCameraOff()
-							}}
+							onSelect={() => setDataSaverMode(!dataSaverMode)}
 						>
-							<Icon type="PhoneIcon" className="mr-2" />
-							{audioOnlyMode ? 'Disable Audio Only' : 'Enable Audio Only'}
+							<Icon type={dataSaverMode ? 'videoOn' : 'videoOff'} className="mr-2" />
+							{dataSaverMode ? 'Show other cameras' : 'Hide other cameras'}
 						</DropdownMenu.Item>
 						<DropdownMenu.Item
 							onSelect={() => navigator.clipboard.writeText(roomUrl)}
 						>
 							<Icon type="ClipboardDocumentIcon" className="mr-2" />
-							Copy URL
+							Copy meeting link
 						</DropdownMenu.Item>
 						<DropdownMenu.Item
 							onSelect={() => {
@@ -68,8 +53,9 @@ export const OverflowMenu: FC<OverflowMenuProps> = ({ bugReportsEnabled }) => {
 							}}
 						>
 							<Icon type="cog" className="mr-2" />
-							Settings
+							Cam & Mic Settings
 						</DropdownMenu.Item>
+
 						{bugReportsEnabled && (
 							<DropdownMenu.Item
 								onSelect={() => {

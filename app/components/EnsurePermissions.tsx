@@ -51,30 +51,34 @@ export function EnsurePermissions(props: EnsurePermissionsProps) {
 
 	if (permissionState === 'prompt') {
 		return (
-			<div className="grid items-center h-full">
-				<div className="mx-auto max-w-80">
-					<p className="mb-8">
-						In order to use Orange Meets, you will need to grant permission to
-						your camera and microphone. You will be prompted for access.
-					</p>
-					<Button
-						onClick={() => {
-							navigator.mediaDevices
-								.getUserMedia({
-									video: true,
-									audio: true,
-								})
-								.then((ms) => {
-									if (mountedRef.current) setPermissionState('granted')
-									ms.getTracks().forEach((t) => t.stop())
-								})
-								.catch(() => {
-									if (mountedRef.current) setPermissionState('denied')
-								})
-						}}
-					>
-						Allow access
-					</Button>
+			<div className="min-h-screen container mx-auto px-4 py-8 flex items-center">
+				<div className="w-full">
+					<div className="max-w-lg mx-auto bg-white p-6 rounded-lg shadow">
+						<div className="mx-auto max-w-80">
+							<p className="mb-8">
+								In order to use WhenMeet.me Call, you will need to grant permission to
+								your camera and microphone. You will be prompted for access.
+							</p>
+							<Button
+								onClick={() => {
+									navigator.mediaDevices
+										.getUserMedia({
+											video: true,
+											audio: true,
+										})
+										.then((ms) => {
+											if (mountedRef.current) setPermissionState('granted')
+											ms.getTracks().forEach((t) => t.stop())
+										})
+										.catch(() => {
+											if (mountedRef.current) setPermissionState('denied')
+										})
+								}}
+							>
+								Allow access
+							</Button>
+						</div>
+					</div>
 				</div>
 			</div>
 		)

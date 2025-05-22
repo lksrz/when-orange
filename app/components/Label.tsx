@@ -1,4 +1,7 @@
 import * as RadixLabel from '@radix-ui/react-label'
 import { style } from '~/utils/style'
 
-export const Label = style(RadixLabel.Root, 'text-zinc-600 dark:text-zinc-300')
+export const Label = style(
+  RadixLabel.Root, 
+  'block text-sm font-medium text-gray-700'
+)
