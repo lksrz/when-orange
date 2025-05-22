@@ -20,24 +20,29 @@ export const action = async ({ request }: ActionFunctionArgs) => {
 
 export default function SetUsername() {
 	return (
-		<div className="grid h-full gap-4 place-content-center">
-			<h1 className="text-3xl font-bold">🍊 Orange Meets</h1>
-			<Form className="flex items-end gap-4" method="post">
-				<div className="grid gap-3">
-					<label htmlFor="username">Enter your display name</label>
-					<Input
-						autoComplete="off"
-						autoFocus
-						required
-						type="text"
-						id="username"
-						name="username"
-					/>
+		<div className="min-h-[calc(100vh-127px)] h-full container mx-auto px-4 py-8 flex items-center">
+			<div className="w-full">
+				<h1 className="text-center text-3xl font-bold text-gray-900 sm:text-4xl md:text-5xl mb-8">
+					Your name
+				</h1>
+
+				<div className="max-w-lg mx-auto bg-white p-6 rounded-lg shadow">
+					<Form className="space-y-6" method="post">
+						<div>
+							<label htmlFor="username">Enter your display name</label>
+							<Input
+								autoComplete="off"
+								autoFocus
+								required
+								type="text"
+								id="username"
+								name="username"
+							/>
+						</div>
+						<Button type="submit">Submit</Button>
+					</Form>
 				</div>
-				<Button className="text-xs" type="submit">
-					Submit
-				</Button>
-			</Form>
+			</div>
 		</div>
 	)
 }
