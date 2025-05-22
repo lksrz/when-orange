@@ -8,7 +8,6 @@ import { AudioIndicator } from '~/components/AudioIndicator'
 import { Button } from '~/components/Button'
 import { CameraButton } from '~/components/CameraButton'
 import { CopyButton } from '~/components/CopyButton'
-import { Disclaimer } from '~/components/Disclaimer'
 import { Icon } from '~/components/Icon/Icon'
 import { MicButton } from '~/components/MicButton'
 
@@ -61,25 +60,35 @@ export default function Lobby() {
 	const roomUrl = useRoomUrl()
 
 	const [params] = useSearchParams()
+	const isLeft = params.get('left') === 'true'
 
 	return (
-		<div className="flex flex-col items-center justify-center h-full p-4">
-			<div className="flex-1"></div>
-			<div className="space-y-4 w-96">
+		<div className="min-h-[calc(100vh-127px)] h-full flex flex-col items-center justify-center p-4">
+			<div className="flex-1 min-h-0"></div>
+			<div className="h-full space-y-4 w-full max-w-5xl">
 				<div>
-					<h1 className="text-3xl font-bold">{roomName}</h1>
+					{/* <h1 className="text-3xl font-bold">{roomName}</h1> */}
 					<p className="text-sm text-zinc-500 dark:text-zinc-400">
 						{`${joinedUsers} ${
 							joinedUsers === 1 ? 'user' : 'users'
-						} in the room.`}{' '}
+						} in the meeting.`}{' '}
 					</p>
 				</div>
 				<div className="relative">
-					<SelfView
-						className="aspect-[4/3] w-full"
-						videoTrack={videoStreamTrack}
-					/>
-
+					{userMedia.videoEnabled ? (
+						<SelfView
+							className="aspect-[4/3] w-full h-[60vh]"
+							videoTrack={videoStreamTrack}
+						/>
+					) : (
+						<div className="bg-gray-200 w-full aspect-[4/3] grid place-items-center">
+							<div className="h-[2em] w-[2em] grid place-items-center text-4xl md:text-6xl 2xl:text-8xl relative">
+								<span className="relative grid w-full h-full uppercase rounded-full place-items-center">
+									<Icon className="text-red-500" type="videoOff" />
+								</span>
+							</div>
+						</div>
+					)}
 					<div className="absolute left-3 top-3">
 						{!sessionError && !session?.sessionId ? (
 							<Spinner className="text-zinc-100" />
@@ -90,7 +99,7 @@ export default function Lobby() {
 										<AudioIndicator audioTrack={audioStreamTrack} />
 									) : (
 										<Tooltip content="Mic is turned off">
-											<div className="text-white indication-shadow">
+											<div className="text-red-500 flex items-center gap-2">
 												<Icon type="micOff" />
 												<VisuallyHidden>Mic is turned off</VisuallyHidden>
 											</div>
@@ -149,28 +158,31 @@ export default function Lobby() {
 					<Button
 						onClick={() => {
 							setJoined(true)
-							// we navigate here with javascript instead of an a
-							// tag because we don't want it to be possible to join
-							// the room without the JS having loaded
+							const newParams = new URLSearchParams(params)
+							newParams.delete('left')
 							navigate(
-								'room' + (params.size > 0 ? '?' + params.toString() : '')
+								'room' +
+									(newParams.toString() ? '?' + newParams.toString() : '')
 							)
 						}}
 						disabled={!session?.sessionId}
+						className="flex items-center gap-2 text-xs relative z-10"
+						autoFocus
 					>
-						Join
+						{!!session?.sessionId && (
+							<div className="absolute inset-0 border-2 border-green-600 rounded-md animate-ping" />
+						)}
+						<span className="md:inline">{isLeft ? 'Rejoin' : 'Join'}</span>
 					</Button>
 					<MicButton />
 					<CameraButton />
 					<SettingsButton />
-					<Tooltip content="Copy URL">
+					<Tooltip content="Copy meeting link">
 						<CopyButton contentValue={roomUrl}></CopyButton>
 					</Tooltip>
 				</div>
 			</div>
-			<div className="flex flex-col justify-end flex-1">
-				<Disclaimer className="pt-6" />
-			</div>
+			<div className="flex flex-col justify-end flex-1 min-h-0"></div>
 		</div>
 	)
 }
