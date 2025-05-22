@@ -15,6 +15,7 @@ globs = ["**/*.js"]
 
 [vars]
 CALLS_APP_ID = "5e6ca5ca9db8b1c4bb0c3eadffc180f0"
+CALLS_API_URL = "https://rtc.live.cloudflare.com"
 TURN_SERVICE_ID = "46711d6c5759085dd70f599f6190ab94"
 PUBLIC = "true"
 E2EE_ENABLED = "true"

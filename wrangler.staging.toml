@@ -24,6 +24,7 @@ class_name = "ChatRoom"
 
 [vars]
 CALLS_APP_ID = "9effffd0c077c1115c7d285e55593a9a"
+CALLS_API_URL = "https://rtc.live.cloudflare.com"
 TURN_SERVICE_ID = "11cebcf8429b947a48c6894650daa021"
 EXPERIMENTAL_SIMULCAST_ENABLED = "true"
 

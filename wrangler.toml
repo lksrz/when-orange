@@ -13,6 +13,7 @@ routes = [
 
 [vars]
 CALLS_APP_ID = "cf0b7d009feba7d66e94027f36d8d382"
+CALLS_API_URL = "https://rtc.live.cloudflare.com"
 TURN_SERVICE_ID = "3d47c5a790a0b730d98bf6ebf0e37553"
 DEEPGRAM_ID = "417702fd-5dbd-402e-8516-fd05922c0d46"
 OPENAI_MODEL_ENDPOINT = "https://api.openai.com/v1/realtime"
