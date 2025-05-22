@@ -312,6 +312,9 @@ export function useE2EE({
 		[room.websocket.id]
 	)
 
+	const [joined, setJoined] = useState(false)
+	const [firstUser, setFirstUser] = useState(false)
+
 	useEffect(() => {
 		return () => {
 			encryptionWorker.dispose()
@@ -319,7 +322,7 @@ export function useE2EE({
 	}, [encryptionWorker])
 
 	useEffect(() => {
-		if (!enabled) return
+		if (!enabled || !joined) return
 
 		const subscription = partyTracks.transceiver$.subscribe((transceiver) => {
 			if (transceiver.direction === 'sendonly') {
@@ -331,6 +334,7 @@ export function useE2EE({
 					)
 					transceiver.setCodecPreferences(vp9codec)
 				}
+				console.log('🔐 Setting up sender transform for', transceiver.sender.track?.kind)
 				encryptionWorker.setupSenderTransform(transceiver.sender)
 			}
 		})
@@ -338,12 +342,13 @@ export function useE2EE({
 		return () => {
 			subscription.unsubscribe()
 		}
-	}, [enabled, encryptionWorker, partyTracks.transceiver$])
+	}, [enabled, joined, encryptionWorker, partyTracks.transceiver$])
 
 	useEffect(() => {
-		if (!enabled) return
+		if (!enabled || !joined) return
 		const subscription = partyTracks.transceiver$.subscribe((transceiver) => {
 			if (transceiver.direction === 'recvonly') {
+				console.log('🔐 Setting up receiver transform for', transceiver.receiver.track?.kind)
 				encryptionWorker.setupReceiverTransform(transceiver.receiver)
 			}
 		})
@@ -351,10 +356,7 @@ export function useE2EE({
 		return () => {
 			subscription.unsubscribe()
 		}
-	}, [enabled, encryptionWorker, partyTracks.transceiver$])
-
-	const [joined, setJoined] = useState(false)
-	const [firstUser, setFirstUser] = useState(false)
+	}, [enabled, joined, encryptionWorker, partyTracks.transceiver$])
 
 	const onJoin = useCallback(
 		(firstUser: boolean) => {
@@ -367,9 +369,11 @@ export function useE2EE({
 
 	useEffect(() => {
 		if (!joined) return
-		encryptionWorker.onNewSafetyNumber((buffer) =>
-			setSafetyNumber(arrayBufferToDecimal(buffer))
-		)
+		encryptionWorker.onNewSafetyNumber((buffer) => {
+			const safetyNum = arrayBufferToDecimal(buffer)
+			console.log('🔐 Safety number generated:', safetyNum)
+			setSafetyNumber(safetyNum)
+		})
 		encryptionWorker.handleOutgoingEvents((data) => {
 			console.log('📬 sending e2eeMlsMessage to peers', data)
 			room.websocket.send(

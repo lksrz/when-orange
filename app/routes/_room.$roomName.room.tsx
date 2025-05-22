@@ -33,6 +33,7 @@ import getUsername from '~/utils/getUsername.server'
 import isNonNullable from '~/utils/isNonNullable'
 import { TranscriptionService } from "~/components/TranscriptionService";
 import { TranscriptionPanel } from "~/components/TranscriptionPanel";
+import { usePulledAudioTracks } from "~/components/PullAudioTracks";
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 	const username = await getUsername(request)
@@ -50,6 +51,11 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 			context.env.OPENAI_API_TOKEN && context.env.OPENAI_MODEL_ENDPOINT
 		),
 		hasTranscriptionCredentials: Boolean(context.env.DEEPGRAM_SECRET),
+		transcriptionProvider: context.env.TRANSCRIPTION_PROVIDER || 'deepgram',
+		hasOpenAiTranscription: Boolean(context.env.OPENAI_API_TOKEN),
+		transcriptionEnabled: context.env.TRANSCRIPTION_ENABLED === 'true',
+		aiInviteEnabled: context.env.AI_INVITE_ENABLED === 'true',
+		e2eeEnabled: context.env.E2EE_ENABLED === 'true',
 	})
 }
 
@@ -82,13 +88,14 @@ function JoinedRoom({
 	bugReportsEnabled: boolean
 	roomName: string
 }) {
-	const { hasDb, hasAiCredentials } = useLoaderData<typeof loader>()
+	const { hasDb, hasAiCredentials, transcriptionProvider, hasOpenAiTranscription, transcriptionEnabled, aiInviteEnabled, e2eeEnabled } = useLoaderData<typeof loader>()
 	const {
 		userMedia,
 		partyTracks,
 		pushedTracks,
 		showDebugInfo,
 		pinnedTileIds,
+		e2eeOnJoin,
 		room: {
 			otherUsers,
 			websocket,
@@ -107,6 +114,15 @@ function JoinedRoom({
 			userMedia.turnMicOff()
 		}
 	})
+
+	// Initialize E2EE after peer connection is established
+	useEffect(() => {
+		if (e2eeEnabled && identity) {
+			const isFirstUser = otherUsers.length === 0
+			console.log('🔐 Calling e2eeOnJoin with firstUser:', isFirstUser, 'identity:', identity.id)
+			e2eeOnJoin(isFirstUser)
+		}
+	}, [e2eeEnabled, identity?.id, e2eeOnJoin]) // Only call once when identity is established
 
 	useBroadcastStatus({
 		userMedia,
@@ -158,8 +174,17 @@ function JoinedRoom({
 
 	const isTranscriptionHost = useMemo(() => {
 		// Use the first joined user as the transcription host
-		// Since we don't have joinedAt, we'll use the first user in the list
-		return otherUsers.length > 0 && otherUsers[0]?.id === identity?.id
+		// If you're alone in the room, you're the host
+		// If there are others, check if you're the first in the sorted list
+		if (otherUsers.length === 0) {
+			return true // You're alone, so you're the host
+		}
+		
+		// Create a list of all users (including yourself) and sort by ID for consistency
+		const allUsers = [...otherUsers, { id: identity?.id }].filter(u => u.id)
+		allUsers.sort((a, b) => (a.id || '').localeCompare(b.id || ''))
+		
+		return allUsers[0]?.id === identity?.id
 	}, [otherUsers, identity])
 
 	const allRemoteAudioTrackIds = useMemo(() => {
@@ -168,6 +193,23 @@ function JoinedRoom({
 			.map((u) => u.tracks.audio!)
 			.filter((track): track is string => track !== undefined)
 	}, [otherUsers, identity])
+
+	// Get actual audio tracks from PullAudioTracks context
+	const pulledAudioTracks = usePulledAudioTracks()
+	
+	// Convert track IDs to actual MediaStreamTrack objects and include own microphone
+	const actualAudioTracks = useMemo(() => {
+		const remoteTracks = allRemoteAudioTrackIds
+			.map(trackId => pulledAudioTracks[trackId])
+			.filter((track): track is MediaStreamTrack => track !== undefined)
+		
+		// Add user's own audio track if available
+		if (userMedia.audioStreamTrack) {
+			remoteTracks.push(userMedia.audioStreamTrack)
+		}
+		
+		return remoteTracks
+	}, [allRemoteAudioTrackIds, pulledAudioTracks, userMedia.audioStreamTrack])
 
 	const [showTranscription, setShowTranscription] = useState(false)
 
@@ -178,7 +220,7 @@ function JoinedRoom({
 			<div className="h-[100vh] flex flex-col bg-white">
 				<div className="relative flex-1 min-h-0">
 					<div
-						className="absolute inset-0 flex isolate gap-[var(--gap)] p-2 sm:p-[var(--gap)]"
+						className="absolute inset-0 flex isolate gap-[var(--gap)] p-2 sm:p-[var(--gap)] pb-[calc(4rem+env(safe-area-inset-bottom))]"
 						style={
 							{
 								'--gap': '1rem',
@@ -196,8 +238,8 @@ function JoinedRoom({
 					</div>
 					<Toast.Viewport className="absolute bottom-0 right-0" />
 				</div>
-				<div className="flex pt-0 sm:pt-0 gap-1 sm:gap-4 text-sm p-2 sm:p-4 ">
-					{hasAiCredentials && <AiButton recordActivity={recordActivity} />}
+				<div className="fixed bottom-0 left-0 right-0 flex pt-0 sm:pt-0 gap-1 sm:gap-4 text-sm p-2 sm:p-4 bg-white border-t border-gray-200 pb-[env(safe-area-inset-bottom)]">
+					{hasAiCredentials && aiInviteEnabled && <AiButton recordActivity={recordActivity} />}
 					<MicButton warnWhenSpeakingWhileMuted />
 					<CameraButton />
 					<ScreenshareButton />
@@ -214,20 +256,38 @@ function JoinedRoom({
 			</div>
 			<HighPacketLossWarningsToast />
 			<IceDisconnectedToast />
-			{isTranscriptionHost && (
+			{isTranscriptionHost && transcriptionEnabled && transcriptionProvider === 'openai' && hasOpenAiTranscription && (
 				<TranscriptionService
-					audioTracks={allRemoteAudioTrackIds as any}
+					audioTracks={actualAudioTracks}
 					isActive={isTranscriptionHost}
 					onTranscription={(t) =>
 						setTranscriptions((prev) => [...prev, t])
 					}
 				/>
 			)}
-			<button onClick={() => setShowTranscription((v) => !v)}>
-				{showTranscription ? "Hide" : "Show"} Transcription
-			</button>
-			{showTranscription && (
-				<TranscriptionPanel transcriptions={transcriptions} />
+			{transcriptionEnabled && (
+				<div className="fixed top-4 right-4 z-50 bg-white border border-gray-300 rounded-lg p-4 shadow-lg">
+					<button 
+						onClick={() => setShowTranscription((v) => !v)}
+						className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+					>
+						{showTranscription ? "Hide" : "Show"} Transcription
+					</button>
+					<div className="text-sm text-gray-600 mt-2">
+						Host: {isTranscriptionHost ? 'Yes' : 'No'} | 
+						Provider: {transcriptionProvider} | 
+						OpenAI: {hasOpenAiTranscription ? 'Yes' : 'No'}
+						<br />
+						Audio Tracks: {actualAudioTracks.length} | 
+						Mic: {userMedia.audioStreamTrack ? 'Yes' : 'No'} | 
+						Remote: {Object.keys(pulledAudioTracks).length}
+					</div>
+				</div>
+			)}
+			{transcriptionEnabled && showTranscription && (
+				<div className="fixed top-20 right-4 z-40 w-80 h-96 bg-white border border-gray-300 rounded-lg shadow-lg">
+					<TranscriptionPanel transcriptions={transcriptions} />
+				</div>
 			)}
 		</PullAudioTracks>
 	)

@@ -29,6 +29,7 @@ import { OptionalLink } from './OptionalLink'
 import { usePulledAudioTrack } from './PullAudioTracks'
 import { Tooltip } from './Tooltip'
 import { VideoSrcObject } from './VideoSrcObject'
+import { E2EEIndicator } from './E2EEIndicator'
 
 function useMid(track?: MediaStreamTrack) {
 	const { partyTracks } = useRoomContext()
@@ -67,6 +68,8 @@ export const Participant = forwardRef<
 		showDebugInfo,
 		userMedia,
 		room: { identity },
+		e2eeEnabled,
+		e2eeSafetyNumber,
 	} = useRoomContext()
 	const peerConnection = useObservableAsValue(partyTracks.peerConnection$)
 	const id = user.id
@@ -264,6 +267,7 @@ export const Participant = forwardRef<
 							</OptionalLink>
 						</div>
 					)}
+					<E2EEIndicator isEncrypted={e2eeEnabled && !!e2eeSafetyNumber} />
 					<div className="absolute top-0 right-0 flex gap-4 p-4">
 						{user.raisedHand && !isScreenShare && (
 							<Tooltip content="Hand is raised">
