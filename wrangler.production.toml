@@ -22,6 +22,10 @@ preview_id = "acb3952303514551a17b6fe627fb6953"
 name = "rooms"
 class_name = "ChatRoom"
 
+[[durable_objects.bindings]]
+name = "transcriptionService"
+class_name = "TranscriptionService"
+
 [vars]
 CALLS_APP_ID = "700932c6384d6f4ba19838afa3ab93cd"
 TURN_SERVICE_ID = "53fa66872a8636170428abae9b049193"
@@ -49,7 +53,11 @@ new_classes = ["ChatRoom", "RateLimiter"]
 
 [[migrations]]
 tag = "v2"
-deleted_classes = ["RateLimiter"] 
+deleted_classes = ["RateLimiter"]
+
+[[migrations]]
+tag = "v3" # Should be unique for each entry
+new_classes = ["TranscriptionService"]
 
 [observability]
 enabled = true

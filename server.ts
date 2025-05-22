@@ -96,6 +96,7 @@ export const createKvAssetHandler = (ASSET_MANIFEST: Record<string, string>) =>
 	}
 
 export { ChatRoom } from './app/durableObjects/ChatRoom.server'
+export { TranscriptionService } from './app/durableObjects/TranscriptionService.server'
 export { queue } from './app/queue'
 
 const kvAssetHandler = createKvAssetHandler(JSON.parse(manifestJSON))
