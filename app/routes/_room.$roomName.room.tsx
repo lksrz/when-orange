@@ -49,6 +49,7 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 		hasAiCredentials: Boolean(
 			context.env.OPENAI_API_TOKEN && context.env.OPENAI_MODEL_ENDPOINT
 		),
+		hasTranscriptionCredentials: Boolean(context.env.DEEPGRAM_SECRET),
 	})
 }
 

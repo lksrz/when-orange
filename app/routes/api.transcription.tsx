@@ -240,7 +240,7 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
     })
     
     // Handle errors
-    server.addEventListener('error', (event: ErrorEvent) => {
+    server.addEventListener('error', (event: Event) => {
       console.error(`🔌 Transcription API [${requestId}]: WebSocket error:`, event)
       // Clean up the ping interval
       clearInterval(pingInterval)

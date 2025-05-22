@@ -48,16 +48,17 @@ export async function action({ request, context }: ActionFunctionArgs) {
     url.searchParams.set('sessionId', sessionId)
     
     // Get the Durable Object stub for the TranscriptionService
-    const id = env.transcriptionService.idFromName(sessionId)
-    const transcriptionService = env.transcriptionService.get(id)
+    const idString = env.transcriptionService.idFromName(sessionId)
+    const transcriptionServiceStub = env.transcriptionService.get(idString)
     
-    // Forward the WebSocket to the Durable Object
-    const response = await transcriptionService.fetch(url.toString(), {
+    // Forward the WebSocket to the Durable Object by fetching with proper upgrade
+    await transcriptionServiceStub.fetch(url.toString(), {
+      method: 'GET',
       headers: request.headers,
     })
     
     // Accept the client-side WebSocket and return it to the client
-    (server as any).accept()
+    ;(server as any).accept()
     
     return new Response(null, {
       status: 101,

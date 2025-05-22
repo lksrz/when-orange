@@ -1,8 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 
 type Transcription = {
+  id: string;
   text: string;
   timestamp: number;
+  isFinal: boolean;
+  userId?: string;
   speaker?: string;
 };
 
@@ -38,7 +41,7 @@ export const TranscriptionService: React.FC<Props> = ({
     let ws: WebSocket;
     (async () => {
       const resp = await fetch("/api/transcription-token");
-      const { token } = await resp.json();
+      const { token }: { token: string } = await resp.json();
       ws = new WebSocket("wss://api.openai.com/v1/audio/transcriptions");
       socketRef.current = ws;
 
@@ -60,8 +63,10 @@ export const TranscriptionService: React.FC<Props> = ({
         const data = JSON.parse(event.data);
         if (data.text) {
           onTranscription({
+            id: `transcription_${Date.now()}_${Math.random()}`,
             text: data.text,
             timestamp: Date.now(),
+            isFinal: true,
             speaker: data.speaker || "Unknown",
           });
         }
