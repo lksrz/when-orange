@@ -20,7 +20,10 @@
       "Bash(sed:*)",
       "Bash(tail:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git rm:*)",
+      "Bash(rm:*)",
+      "Bash(npm install)"
     ],
     "deny": []
   }

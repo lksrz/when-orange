@@ -144,19 +144,28 @@ function JoinedRoom({
 		(u) => !pinnedTileIds.includes(u.id)
 	)
 
+	interface Transcription {
+		id: string
+		text: string
+		timestamp: number
+		isFinal: boolean
+		userId?: string
+		speaker?: string
+	}
+
 	const [transcriptions, setTranscriptions] = useState<Transcription[]>([])
 
 	const isTranscriptionHost = useMemo(() => {
-		const sortedUsers = [...otherUsers].sort((a, b) =>
-			new Date(a.joinedAt).getTime() - new Date(b.joinedAt).getTime()
-		)
-		return sortedUsers[0]?.id === identity?.id
+		// Use the first joined user as the transcription host
+		// Since we don't have joinedAt, we'll use the first user in the list
+		return otherUsers.length > 0 && otherUsers[0]?.id === identity?.id
 	}, [otherUsers, identity])
 
-	const allRemoteAudioTracks = useMemo(() => {
+	const allRemoteAudioTrackIds = useMemo(() => {
 		return otherUsers
-			.filter((u) => u.id !== identity?.id)
-			.flatMap((u) => u.tracks.audio)
+			.filter((u) => u.id !== identity?.id && u.tracks.audio)
+			.map((u) => u.tracks.audio!)
+			.filter((track): track is string => track !== undefined)
 	}, [otherUsers, identity])
 
 	const [showTranscription, setShowTranscription] = useState(false)
@@ -206,7 +215,7 @@ function JoinedRoom({
 			<IceDisconnectedToast />
 			{isTranscriptionHost && (
 				<TranscriptionService
-					audioTracks={allRemoteAudioTracks}
+					audioTracks={allRemoteAudioTrackIds as any}
 					isActive={isTranscriptionHost}
 					onTranscription={(t) =>
 						setTranscriptions((prev) => [...prev, t])

@@ -1,5 +1,6 @@
 export type Env = {
 	rooms: DurableObjectNamespace
+	transcriptionService: DurableObjectNamespace
 	CALLS_APP_ID: string
 	CALLS_APP_SECRET: string
 	CALLS_API_URL?: string
@@ -22,4 +23,7 @@ export type Env = {
 	OPENAI_MODEL_ENDPOINT?: string
 	OPENAI_MODEL_ID?: string
 	DASHBOARD_WORKER_URL?: string
+	DEEPGRAM_SECRET?: string
+	DEEPGRAM_CONNECTION_TIMEOUT?: string
+	AUTH_SECRET?: string
 }

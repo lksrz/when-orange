@@ -52,12 +52,12 @@ export async function action({ request, context }: ActionFunctionArgs) {
     const transcriptionService = env.transcriptionService.get(id)
     
     // Forward the WebSocket to the Durable Object
-    await transcriptionService.fetch(url.toString(), {
+    const response = await transcriptionService.fetch(url.toString(), {
       headers: request.headers,
     })
     
     // Accept the client-side WebSocket and return it to the client
-    server.accept()
+    (server as any).accept()
     
     return new Response(null, {
       status: 101,

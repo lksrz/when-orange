@@ -132,8 +132,8 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
     const pair = new WebSocketPair()
     
     // Accept the server-side socket right away
-    const server = pair[1]
-    server.accept()
+    const server: WebSocket = pair[1] as any
+    ;(server as any).accept()
     
     // Create a unique ID for this session using a deterministic but secure method
     // This way, reconnections from the same user token will go to the same DO
@@ -162,7 +162,7 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
     }, 30000) // ping every 30 seconds
     
     // WebSocket event handlers
-    server.addEventListener('message', async (event) => {
+    server.addEventListener('message', async (event: MessageEvent) => {
       try {
         const data = event.data
         // Use full URL for Durable Object fetch
@@ -174,7 +174,7 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
           dataSize: data instanceof ArrayBuffer ? data.byteLength : (data.length || 'unknown')
         })
         
-        const response = await stub.fetch(doUrl, {
+        const response = await stub.fetch(doUrl.toString(), {
           method: 'POST',
           headers: {
             'Content-Type': data instanceof ArrayBuffer ? 'application/octet-stream' : 'application/json',
@@ -217,14 +217,14 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
     })
     
     // When the client closes the connection
-    server.addEventListener('close', async (event) => {
+    server.addEventListener('close', async (event: CloseEvent) => {
       try {
         console.log(`🔌 Transcription API [${requestId}]: WebSocket closed with code ${event.code} reason: ${event.reason || 'none'}`)
         // Clean up the ping interval
         clearInterval(pingInterval)
         
         // Notify the Durable Object
-        await stub.fetch(new URL(url.toString()), {
+        await stub.fetch(url.toString(), {
           method: 'DELETE',
           headers: {
             'Content-Type': 'application/json',
@@ -240,7 +240,7 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
     })
     
     // Handle errors
-    server.addEventListener('error', (event) => {
+    server.addEventListener('error', (event: ErrorEvent) => {
       console.error(`🔌 Transcription API [${requestId}]: WebSocket error:`, event)
       // Clean up the ping interval
       clearInterval(pingInterval)
@@ -250,7 +250,7 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
     try {
       console.log(`🔌 Transcription API [${requestId}]: Initializing DO session`)
       
-      const initResponse = await stub.fetch(new URL(url.toString()), {
+      const initResponse = await stub.fetch(url.toString(), {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

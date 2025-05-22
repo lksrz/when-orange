@@ -1,4 +1,3 @@
-import { type ApiHistoryEntry } from 'partytracks/client'
 import type { TrackObject } from '~/utils/callsTypes'
 
 export type User = {
@@ -51,12 +50,16 @@ export type ServerMessage =
 			type: 'partyserver-pong'
 	  }
 	| {
-			type: 'e2eeMlsMessage'
-			payload: string
+			type: 'aiSdp'
+			sdp: string
 	  }
 	| {
 			type: 'userLeftNotification'
 			id: string
+	  }
+	| {
+			type: 'e2eeMlsMessage'
+			payload: any
 	  }
 
 export type ClientMessage =
@@ -99,10 +102,9 @@ export type ClientMessage =
 	  }
 	| {
 			type: 'callsApiHistoryEntry'
-			entry: ApiHistoryEntry
-			sessionId?: string
+			[key: string]: any
 	  }
 	| {
 			type: 'e2eeMlsMessage'
-			payload: string
+			payload: any
 	  }

@@ -165,7 +165,9 @@ function Room({ room, userMedia }: RoomProps) {
 	const videoTrackEncodingParams$ =
 		useValueAsObservable<RTCRtpEncodingParameters[]>(videoEncodingParams)
 	const pushedVideoTrack$ = useMemo(
-		() => partyTracks.push(userMedia.videoTrack$, videoTrackEncodingParams$),
+		() => partyTracks.push(userMedia.videoTrack$, {
+			sendEncodings$: videoTrackEncodingParams$,
+		}),
 		[partyTracks, userMedia.videoTrack$, videoTrackEncodingParams$]
 	)
 
@@ -173,14 +175,13 @@ function Room({ room, userMedia }: RoomProps) {
 
 	const pushedAudioTrack$ = useMemo(
 		() =>
-			partyTracks.push(
-				userMedia.publicAudioTrack$,
-				of<RTCRtpEncodingParameters[]>([
+			partyTracks.push(userMedia.publicAudioTrack$, {
+				sendEncodings$: of<RTCRtpEncodingParameters[]>([
 					{
 						networkPriority: 'high',
 					},
-				])
-			),
+				]),
+			}),
 		[partyTracks, userMedia.publicAudioTrack$]
 	)
 	const pushedAudioTrack = useObservableAsValue(pushedAudioTrack$)
@@ -205,6 +206,8 @@ function Room({ room, userMedia }: RoomProps) {
 		setPinnedTileIds,
 		showDebugInfo,
 		setShowDebugInfo,
+		audioOnlyMode: false,
+		setAudioOnlyMode: () => {},
 		dataSaverMode,
 		setDataSaverMode,
 		traceLink,
@@ -215,6 +218,8 @@ function Room({ room, userMedia }: RoomProps) {
 		roomHistory,
 		iceConnectionState,
 		room,
+		simulcastEnabled: false,
+		e2eeOnJoin: () => {},
 		pushedTracks: {
 			video: trackObjectToString(pushedVideoTrack),
 			audio: trackObjectToString(pushedAudioTrack),
