@@ -415,16 +415,7 @@ export function useE2EE({
 
 		const subscription = partyTracks.transceiver$.subscribe((transceiver) => {
 			if (transceiver.direction === 'recvonly') {
-				// Additional safety check: ensure receiver has a track before setting up transform
-				if (transceiver.receiver.track) {
-					console.log(
-						'🔐 Setting up receiver transform for track:',
-						transceiver.receiver.track.id,
-						'mid:',
-						transceiver.mid
-					)
-					encryptionWorker.setupReceiverTransform(transceiver.receiver)
-				}
+				encryptionWorker.setupReceiverTransform(transceiver.receiver)
 			}
 		})
 
@@ -445,18 +436,14 @@ export function useE2EE({
 	useEffect(() => {
 		if (!joined || !workerReady) return
 
-		console.log(
-			'🔐 Setting up E2EE event handlers, worker ready:',
-			workerReady,
-			'joined:',
-			joined
-		)
+		console.log('🔐 Setting up E2EE for', firstUser ? 'first user' : 'joining user')
 
 		encryptionWorker.onNewSafetyNumber((buffer) => {
 			const safetyNum = arrayBufferToDecimal(buffer)
 			console.log('🔐 Safety number generated:', safetyNum)
 			setSafetyNumber(safetyNum)
 		})
+		
 		encryptionWorker.handleOutgoingEvents((data) => {
 			console.log('📬 sending e2eeMlsMessage to peers', data)
 			room.websocket.send(
@@ -466,6 +453,7 @@ export function useE2EE({
 				})
 			)
 		})
+		
 		const handler = (event: MessageEvent) => {
 			const message = JSON.parse(event.data) as ServerMessage
 			if (message.type === 'e2eeMlsMessage') {
@@ -479,16 +467,14 @@ export function useE2EE({
 
 		room.websocket.addEventListener('message', handler)
 
-		// Add delay to ensure worker is fully initialized before creating/joining group
-		setTimeout(() => {
-			if (firstUser) {
-				console.log('🔐 Initializing and creating group as first user')
-				encryptionWorker.initializeAndCreateGroup()
-			} else {
-				console.log('🔐 Initializing worker as joining user')
-				encryptionWorker.initialize()
-			}
-		}, 100)
+		// Initialize after handlers are set up
+		if (firstUser) {
+			console.log('🔐 Initializing and creating group as first user')
+			encryptionWorker.initializeAndCreateGroup()
+		} else {
+			console.log('🔐 Initializing worker as joining user')
+			encryptionWorker.initialize()
+		}
 
 		return () => {
 			room.websocket.removeEventListener('message', handler)
