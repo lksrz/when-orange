@@ -64,12 +64,14 @@ type Props = {
   audioTracks: MediaStreamTrack[];
   onTranscription: (t: Transcription) => void;
   isActive: boolean; // Only true for the host
+  participants: string[]; // names used for prompting
 };
 
 export const TranscriptionService: React.FC<Props> = ({
   audioTracks,
   onTranscription,
   isActive,
+  participants,
 }) => {
 
   useEffect(() => {
@@ -88,15 +90,64 @@ export const TranscriptionService: React.FC<Props> = ({
     (async () => {
       try {
         // Get OpenAI token
-        const resp = await fetch("/api/transcription-token", { method: 'POST' });
+        const resp = await fetch('/api/transcription-token', { method: 'POST' });
         if (!resp.ok) {
           throw new Error(`Failed to get OpenAI token: ${resp.status}`);
         }
         const { token }: { token: string } = await resp.json();
 
+        // Attempt realtime WebSocket connection
+        const prompt = `This is transcription of an online meeting with participants: ${participants.join(', ')}.`;
+        let ws: WebSocket | null = null;
+        let useRealtime = true;
+        try {
+          ws = new WebSocket(
+            `wss://api.openai.com/v1/realtime?intent=transcription&access_token=${token}`
+          );
+
+          ws.addEventListener('open', () => {
+            ws?.send(
+              JSON.stringify({
+                type: 'transcription_session.update',
+                input_audio_format: 'pcm16',
+                input_audio_transcription: {
+                  model: 'gpt-4o-transcribe',
+                  prompt,
+                  language: 'en',
+                },
+              })
+            );
+          });
+
+          ws.addEventListener('message', (event) => {
+            try {
+              const data = JSON.parse(event.data);
+              if (data.text) {
+                onTranscription({
+                  id: `openai_${Date.now()}_${Math.random()}`,
+                  text: data.text,
+                  timestamp: Date.now(),
+                  isFinal: true,
+                  speaker: 'OpenAI',
+                });
+              }
+            } catch (e) {
+              console.error('Realtime transcription parse error', e);
+            }
+          });
+
+          ws.addEventListener('error', () => {
+            console.warn('Realtime WebSocket failed, falling back to POST');
+            useRealtime = false;
+          });
+        } catch (err) {
+          console.warn('Realtime WebSocket setup failed, falling back to POST');
+          useRealtime = false;
+        }
+
         // Create MediaRecorder
         mediaRecorder = new MediaRecorder(combinedStream, {
-          mimeType: 'audio/webm;codecs=opus'
+          mimeType: 'audio/webm;codecs=opus',
         });
 
         const audioChunks: Blob[] = [];
@@ -143,39 +194,47 @@ export const TranscriptionService: React.FC<Props> = ({
             
             // Convert to WAV
             const wavBuffer = audioBufferToWav(audioBuffer);
-            const audioBlob = new Blob([wavBuffer], { type: 'audio/wav' });
             await conversionAudioContext.close();
-            
-            console.log('Sending audio to OpenAI:', audioBlob.size, 'bytes, RMS:', rms.toFixed(4));
 
-            // Send to OpenAI
-            const formData = new FormData();
-            formData.append('file', audioBlob, 'audio.wav');
-            formData.append('model', 'whisper-1');
-            formData.append('language', 'en');
-            formData.append('response_format', 'json');
-            formData.append('temperature', '0');
-
-            const transcriptionResp = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${token}` },
-              body: formData
-            });
-
-            if (transcriptionResp.ok) {
-              const transcriptionData = await transcriptionResp.json() as { text?: string };
-              if (transcriptionData.text && transcriptionData.text.trim()) {
-                console.log('Transcription received:', transcriptionData.text);
-                onTranscription({
-                  id: `openai_${Date.now()}_${Math.random()}`,
-                  text: transcriptionData.text,
-                  timestamp: Date.now(),
-                  isFinal: true,
-                  speaker: "OpenAI Whisper",
-                });
-              }
+            if (useRealtime && ws && ws.readyState === WebSocket.OPEN) {
+              // send via realtime websocket
+              const base64 = btoa(String.fromCharCode(...new Uint8Array(wavBuffer)));
+              ws.send(
+                JSON.stringify({
+                  type: 'input_audio_buffer.append',
+                  audio: base64,
+                })
+              );
             } else {
-              console.error('OpenAI transcription failed:', transcriptionResp.status);
+              const audioBlob = new Blob([wavBuffer], { type: 'audio/wav' });
+              console.log('Sending audio to OpenAI via POST:', audioBlob.size, 'bytes, RMS:', rms.toFixed(4));
+              const formData = new FormData();
+              formData.append('file', audioBlob, 'audio.wav');
+              formData.append('model', 'gpt-4o-transcribe');
+              formData.append('language', 'en');
+              formData.append('response_format', 'json');
+              formData.append('prompt', prompt);
+
+              const transcriptionResp = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+                body: formData,
+              });
+
+              if (transcriptionResp.ok) {
+                const transcriptionData = (await transcriptionResp.json()) as { text?: string };
+                if (transcriptionData.text && transcriptionData.text.trim()) {
+                  onTranscription({
+                    id: `openai_${Date.now()}_${Math.random()}`,
+                    text: transcriptionData.text,
+                    timestamp: Date.now(),
+                    isFinal: true,
+                    speaker: 'OpenAI',
+                  });
+                }
+              } else {
+                console.error('OpenAI transcription failed:', transcriptionResp.status);
+              }
             }
           } catch (error) {
             console.error('Transcription error:', error);
@@ -220,7 +279,7 @@ export const TranscriptionService: React.FC<Props> = ({
         mediaRecorder.stop();
       }
     };
-  }, [isActive, audioTracks, onTranscription]);
+  }, [isActive, audioTracks, onTranscription, participants]);
 
   return null; // No UI, just a service
 };

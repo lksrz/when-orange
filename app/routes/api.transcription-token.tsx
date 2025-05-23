@@ -30,7 +30,7 @@ export const action = async ({ context }: ActionFunctionArgs) => {
     // or use a different authentication method for better security
     return new Response(JSON.stringify({
       token: context.env.OPENAI_API_TOKEN,
-      model: 'whisper-1',
+      model: 'gpt-4o-transcribe',
       timestamp: Date.now()
     }), {
       status: 200,

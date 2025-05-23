@@ -211,7 +211,15 @@ function JoinedRoom({
 		return remoteTracks
 	}, [allRemoteAudioTrackIds, pulledAudioTracks, userMedia.audioStreamTrack])
 
-	const [showTranscription, setShowTranscription] = useState(false)
+       const [showTranscription, setShowTranscription] = useState(false)
+
+       const participantNames = useMemo(
+               () => [
+                       identity?.name,
+                       ...otherUsers.map((u) => u.name),
+               ].filter(Boolean) as string[],
+               [identity?.name, otherUsers]
+       )
 
 	return (
 		<PullAudioTracks
@@ -257,13 +265,14 @@ function JoinedRoom({
 			<HighPacketLossWarningsToast />
 			<IceDisconnectedToast />
 			{isTranscriptionHost && transcriptionEnabled && transcriptionProvider === 'openai' && hasOpenAiTranscription && (
-				<TranscriptionService
-					audioTracks={actualAudioTracks}
-					isActive={isTranscriptionHost}
-					onTranscription={(t) =>
-						setTranscriptions((prev) => [...prev, t])
-					}
-				/>
+                               <TranscriptionService
+                                       audioTracks={actualAudioTracks}
+                                       isActive={isTranscriptionHost}
+                                       participants={participantNames}
+                                       onTranscription={(t) =>
+                                               setTranscriptions((prev) => [...prev, t])
+                                       }
+                               />
 			)}
 			{transcriptionEnabled && (
 				<div className="fixed top-4 right-4 z-50 bg-white border border-gray-300 rounded-lg p-4 shadow-lg">
