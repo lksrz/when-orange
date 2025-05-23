@@ -255,9 +255,9 @@ function JoinedRoom({
 			audioTracks={otherUsers.map((u) => u.tracks.audio).filter(isNonNullable)}
 		>
 			<div className="h-[100vh] flex flex-col bg-white">
-				<div className="relative flex-1 min-h-0">
+				<div className="flex-1 relative overflow-hidden">
 					<div
-						className="absolute inset-0 flex isolate gap-[var(--gap)] p-2 sm:p-[var(--gap)] pb-[calc(5rem+env(safe-area-inset-bottom))]"
+						className="absolute inset-0 flex isolate gap-[var(--gap)] p-2 sm:p-[var(--gap)]"
 						style={
 							{
 								'--gap': '1rem',
@@ -275,7 +275,7 @@ function JoinedRoom({
 					</div>
 					<Toast.Viewport className="absolute bottom-0 right-0" />
 				</div>
-				<div className="fixed bottom-0 left-0 right-0 flex pt-0 sm:pt-0 gap-1 sm:gap-4 text-sm p-2 sm:p-4 bg-white border-t border-gray-200 pb-[env(safe-area-inset-bottom)]">
+				<div className="flex-shrink-0 flex items-center justify-center gap-1 sm:gap-4 text-sm p-2 sm:p-4 bg-white pb-[env(safe-area-inset-bottom)] h-[3rem]">
 					{hasAiCredentials && aiInviteEnabled && (
 						<AiButton recordActivity={recordActivity} />
 					)}

@@ -104,21 +104,37 @@ export class EncryptionWorker {
 	_worker: Worker | null = null
 	safetyNumber: number = -1
 	id: string
+	ready: boolean = false
 
 	constructor(config: { id: string }) {
 		this.id = config.id
 		this._worker = new Worker('/e2ee/worker.js')
+
+		// Listen for worker ready signal
+		this._worker.addEventListener('message', (event) => {
+			if (event.data.type === 'workerReady') {
+				this.ready = true
+			}
+		})
 	}
 
 	dispose() {
-		this.worker.terminate()
+		this._worker?.terminate()
+		this._worker = null
+		this.ready = false
 	}
 
 	initialize() {
+		if (!this.ready) {
+			console.warn('🔐 Worker not ready yet, initialization may fail')
+		}
 		this.worker.postMessage({ type: 'initialize', id: this.id })
 	}
 
 	initializeAndCreateGroup() {
+		if (!this.ready) {
+			console.warn('🔐 Worker not ready yet, group creation may fail')
+		}
 		this.worker.postMessage({ type: 'initializeAndCreateGroup', id: this.id })
 	}
 
@@ -150,7 +166,25 @@ export class EncryptionWorker {
 	}
 
 	async setupSenderTransform(sender: RTCRtpSender) {
-		console.log('Setting up sender transform')
+		if (!this.ready) {
+			console.warn('🔐 Worker not ready, delaying sender transform setup')
+			// Wait for worker to be ready with timeout
+			let attempts = 0
+			const maxAttempts = 100 // 5 seconds maximum
+			while (!this.ready && attempts < maxAttempts) {
+				await new Promise((resolve) => setTimeout(resolve, 50))
+				attempts++
+			}
+
+			if (!this.ready) {
+				console.error(
+					'🔐 Worker failed to become ready within timeout, sender transform setup failed'
+				)
+				return
+			}
+		}
+
+		console.log('🔐 Setting up sender transform for', sender.track?.kind)
 
 		// If this is Firefox, we will have to use RTCRtpScriptTransform
 		if (window.RTCRtpScriptTransform) {
@@ -185,7 +219,25 @@ export class EncryptionWorker {
 	}
 
 	async setupReceiverTransform(receiver: RTCRtpReceiver) {
-		console.log('Setting up receiver transform')
+		if (!this.ready) {
+			console.warn('🔐 Worker not ready, delaying receiver transform setup')
+			// Wait for worker to be ready with timeout
+			let attempts = 0
+			const maxAttempts = 100 // 5 seconds maximum
+			while (!this.ready && attempts < maxAttempts) {
+				await new Promise((resolve) => setTimeout(resolve, 50))
+				attempts++
+			}
+
+			if (!this.ready) {
+				console.error(
+					'🔐 Worker failed to become ready within timeout, receiver transform setup failed'
+				)
+				return
+			}
+		}
+
+		console.log('🔐 Setting up receiver transform for', receiver.track?.kind)
 
 		// If this is Firefox, we will have to use RTCRtpScriptTransform
 		if (window.RTCRtpScriptTransform) {
@@ -303,6 +355,7 @@ export function useE2EE({
 	room: ReturnType<typeof useRoom>
 }) {
 	const [safetyNumber, setSafetyNumber] = useState<string>()
+	const [workerReady, setWorkerReady] = useState(false)
 
 	const encryptionWorker = useMemo(
 		() =>
@@ -321,8 +374,28 @@ export function useE2EE({
 		}
 	}, [encryptionWorker])
 
+	// Track worker readiness
 	useEffect(() => {
-		if (!enabled || !joined) return
+		if (!enabled) return
+
+		const handleWorkerMessage = (event: MessageEvent) => {
+			if (event.data.type === 'workerReady') {
+				setWorkerReady(true)
+			}
+		}
+
+		encryptionWorker.worker.addEventListener('message', handleWorkerMessage)
+
+		return () => {
+			encryptionWorker.worker.removeEventListener(
+				'message',
+				handleWorkerMessage
+			)
+		}
+	}, [enabled, encryptionWorker])
+
+	useEffect(() => {
+		if (!enabled || !joined || !workerReady) return
 
 		const subscription = partyTracks.transceiver$.subscribe((transceiver) => {
 			if (transceiver.direction === 'sendonly') {
@@ -345,10 +418,10 @@ export function useE2EE({
 		return () => {
 			subscription.unsubscribe()
 		}
-	}, [enabled, joined, encryptionWorker, partyTracks.transceiver$])
+	}, [enabled, joined, workerReady, encryptionWorker, partyTracks.transceiver$])
 
 	useEffect(() => {
-		if (!enabled || !joined) return
+		if (!enabled || !joined || !workerReady) return
 		const subscription = partyTracks.transceiver$.subscribe((transceiver) => {
 			if (transceiver.direction === 'recvonly') {
 				console.log(
@@ -362,7 +435,7 @@ export function useE2EE({
 		return () => {
 			subscription.unsubscribe()
 		}
-	}, [enabled, joined, encryptionWorker, partyTracks.transceiver$])
+	}, [enabled, joined, workerReady, encryptionWorker, partyTracks.transceiver$])
 
 	const onJoin = useCallback(
 		(firstUser: boolean) => {
@@ -374,7 +447,15 @@ export function useE2EE({
 	)
 
 	useEffect(() => {
-		if (!joined) return
+		if (!joined || !workerReady) return
+
+		console.log(
+			'🔐 Setting up E2EE event handlers, worker ready:',
+			workerReady,
+			'joined:',
+			joined
+		)
+
 		encryptionWorker.onNewSafetyNumber((buffer) => {
 			const safetyNum = arrayBufferToDecimal(buffer)
 			console.log('🔐 Safety number generated:', safetyNum)
@@ -402,19 +483,37 @@ export function useE2EE({
 
 		room.websocket.addEventListener('message', handler)
 
-		if (firstUser) {
-			encryptionWorker.initializeAndCreateGroup()
-		} else {
-			encryptionWorker.initialize()
-		}
+		// Add delay to ensure worker is fully initialized before creating/joining group
+		setTimeout(() => {
+			if (firstUser) {
+				console.log('🔐 Initializing and creating group as first user')
+				encryptionWorker.initializeAndCreateGroup()
+			} else {
+				console.log('🔐 Initializing worker as joining user')
+				encryptionWorker.initialize()
+			}
+		}, 100)
 
 		return () => {
 			room.websocket.removeEventListener('message', handler)
 		}
-	}, [encryptionWorker, firstUser, joined, room.websocket])
+	}, [encryptionWorker, firstUser, joined, workerReady, room.websocket])
+
+	// Log ready state changes for debugging
+	useEffect(() => {
+		const isReady = enabled && workerReady && joined
+		console.log('🔐 E2EE ready state changed:', {
+			enabled,
+			workerReady,
+			joined,
+			isReady,
+			safetyNumber: !!safetyNumber,
+		})
+	}, [enabled, workerReady, joined, safetyNumber])
 
 	return {
 		e2eeSafetyNumber: enabled ? safetyNumber : undefined,
+		e2eeReady: enabled && workerReady && joined,
 		onJoin,
 	}
 }

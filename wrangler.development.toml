@@ -1,6 +1,6 @@
-name = "orange-meets-development"
+name = "whenmeet-call-development"
 
-account_id = "8477399eb04accc1792af96aeaa25222"
+account_id = "9e7cfb40f9896e268a8212dc58e20780"
 main = "./build/index.js"
 # https://developers.cloudflare.com/workers/platform/compatibility-dates
 compatibility_date = "2024-10-07"
@@ -23,17 +23,18 @@ name = "rooms"
 class_name = "ChatRoom"
 
 [vars]
-CALLS_APP_ID = "f0ea263009299383d09d44b9fad5316c"
+CALLS_APP_ID = "cf0b7d009feba7d66e94027f36d8d382"
 CALLS_API_URL = "https://rtc.live.cloudflare.com"
-TURN_SERVICE_ID = "124bb066f462e966159bc4eef4b42048"
+TURN_SERVICE_ID = "8e23802ba4345fef28437a3190a90f18"
 EXPERIMENTAL_SIMULCAST_ENABLED = "true"
+CALLS_APP_SECRET = "placeholder"
 
 [[queues.producers]]
- queue = "orange-meets-feedback-queue-development"
+ queue = "whenmeet-call-feedback-queue-development"
  binding = "FEEDBACK_QUEUE"
 
 [[queues.consumers]]
- queue = "orange-meets-feedback-queue-development"
+ queue = "whenmeet-call-feedback-queue-development"
  # Required: this should match the name of the queue you created in step 3.
  # If you misspell the name, you will receive an error when attempting to publish your Worker.
  max_batch_size = 10 # optional: defaults to 10
@@ -41,7 +42,7 @@ EXPERIMENTAL_SIMULCAST_ENABLED = "true"
 
 [[d1_databases]]
 binding = "DB" # i.e. available in your Worker on env.DB
-database_name = "orange-meets-db-development"
+database_name = "whenmeet-call-db-development"
 database_id = "6b0eceef-c836-4ba7-aac2-fa9b6f702e3b"
 
 # Indicate that you want the ChatRoom and RateLimiter classes to be callable as Durable Objects.

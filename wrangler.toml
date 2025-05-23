@@ -1,4 +1,5 @@
 name = "whenmeet-call"
+account_id = "9e7cfb40f9896e268a8212dc58e20780"
 # https://developers.cloudflare.com/workers/platform/compatibility-dates
 compatibility_date = "2024-10-07"
 main = "./build/index.js"
@@ -20,8 +21,8 @@ OPENAI_MODEL_ENDPOINT = "https://api.openai.com/v1"
 TRANSCRIPTION_PROVIDER = "openai"
 TRANSCRIPTION_ENABLED = "false"
 AI_INVITE_ENABLED = "false"
-PUBLIC = "true"
 E2EE_ENABLED = "true"
+CALLS_APP_SECRET = "overrided_by_devvars_or_production_secret"
 
 [observability]
 enabled = true

@@ -9,8 +9,6 @@ const proxy = async ({ request, context }: LoaderFunctionArgs) => {
 	const targetUrl = `${context.env.CALLS_API_URL}/apps/${context.env.CALLS_APP_ID}${pathname}${search}`
 
 	console.log('Proxying request to:', targetUrl)
-	console.log('Method:', request.method)
-	console.log('Headers:', Object.fromEntries(request.headers.entries()))
 
 	try {
 		// Forward the request to Cloudflare RTC API
