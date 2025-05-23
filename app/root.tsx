@@ -219,7 +219,7 @@ export const Footer = () => {
 								viewBox="0 0 120 120"
 								className="hidden sm:block"
 							>
-								<g clip-path="url(#clip0_327_2248)">
+								<g clipPath="url(#clip0_327_2248)">
 									<mask
 										id="mask0_327_2248"
 										width="314"
@@ -231,27 +231,27 @@ export const Footer = () => {
 									>
 										<path
 											stroke="#F63"
-											stroke-linecap="round"
-											stroke-width="1.4"
+											strokeLinecap="round"
+											strokeWidth="1.4"
 											d="M92.88 88.89V30.14M98.63 38.82v41.96M104.38 50.6v18.7M110.2 55.76l-.07 7M116 52.81l-.03 14.28M23.86 88.89V30.14M69.87 73.42V45.45M46.87 80.79V38.83M87.13 96.25V23.52M18.11 68.27V51.5M64.12 77.84V41.48M41.12 84.47V34.12M81.38 106.55V11.96M12.36 68.27V51.5M58.37 77.84V41.48M35.37 99.2V19.67M7 75V45M.86 141.9V-23.16M75.62 90.36V28.82M52.62 74.9V44.13M29.61 82.26V37.5"
 										></path>
 									</mask>
 									<g mask="url(#mask0_327_2248)">
 										<path
 											fill="url(#paint0_linear_327_2248)"
-											fill-opacity=".4"
+											fillOpacity=".4"
 											d="M121 115H4V5h117v110Z"
 										></path>
 									</g>
 									<path
 										fill="url(#paint1_linear_327_2248)"
-										fill-rule="evenodd"
+										fillRule="evenodd"
 										d="M51.92 51.5c1.2-2.34 6.43-4.21 7.6-5.04l.79-.7-.52-11.55s-6.79-4.48-13.93 1.6c-13.49 11.98 12.37 56.77 29.5 51.08 9-3.1 8.52-11.22 8.52-11.22l-9.93-6.28-1.3.6c-1.25.43-5.24 3.93-7.86 3.8-2.28-.04-13.97-20.3-12.87-22.28Z"
-										clip-rule="evenodd"
+										clipRule="evenodd"
 									></path>
 									<path
 										stroke="#fff"
-										stroke-width="1.03"
+										strokeWidth="1.03"
 										d="m69.11 73.06 11.99 9.59M55.35 48.25l-2.3-15.17"
 									></path>
 								</g>
@@ -264,9 +264,9 @@ export const Footer = () => {
 										y2="77.74"
 										gradientUnits="userSpaceOnUse"
 									>
-										<stop stop-color="#F63"></stop>
-										<stop offset=".45" stop-color="#F6821F"></stop>
-										<stop offset=".96" stop-color="#FBAD41"></stop>
+										<stop stopColor="#F63"></stop>
+										<stop offset=".45" stopColor="#F6821F"></stop>
+										<stop offset=".96" stopColor="#FBAD41"></stop>
 									</linearGradient>
 									<linearGradient
 										id="paint1_linear_327_2248"
@@ -276,10 +276,10 @@ export const Footer = () => {
 										y2="32.68"
 										gradientUnits="userSpaceOnUse"
 									>
-										<stop stop-color="#F63"></stop>
-										<stop offset=".37" stop-color="#F6821F"></stop>
-										<stop offset=".69" stop-color="#FBAD41"></stop>
-										<stop offset=".99" stop-color="#FFE9CB"></stop>
+										<stop stopColor="#F63"></stop>
+										<stop offset=".37" stopColor="#F6821F"></stop>
+										<stop offset=".69" stopColor="#FBAD41"></stop>
+										<stop offset=".99" stopColor="#FFE9CB"></stop>
 									</linearGradient>
 									<clipPath id="clip0_327_2248">
 										<path fill="#fff" d="M0 0h120v120H0z"></path>
