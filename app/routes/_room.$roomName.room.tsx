@@ -29,6 +29,7 @@ import { TranscriptionPanel } from '~/components/TranscriptionPanel'
 import { TranscriptionService } from '~/components/TranscriptionService'
 import useBroadcastStatus from '~/hooks/useBroadcastStatus'
 import useIsSpeaking from '~/hooks/useIsSpeaking'
+import { useMobileViewportHeight } from '~/hooks/useMobileViewportHeight'
 import { useRoomContext } from '~/hooks/useRoomContext'
 import { useShowDebugInfoShortcut } from '~/hooks/useShowDebugInfoShortcut'
 import useSounds from '~/hooks/useSounds'
@@ -127,6 +128,9 @@ function JoinedRoom({
 			roomState: { meetingId },
 		},
 	} = useRoomContext()
+
+	// Initialize mobile viewport height handling
+	useMobileViewportHeight()
 
 	useShowDebugInfoShortcut()
 
@@ -254,7 +258,7 @@ function JoinedRoom({
 		<PullAudioTracks
 			audioTracks={otherUsers.map((u) => u.tracks.audio).filter(isNonNullable)}
 		>
-			<div className="h-[100vh] flex flex-col bg-white">
+			<div className="h-mobile-screen flex flex-col bg-white">
 				<div className="flex-1 relative overflow-hidden">
 					<div
 						className="absolute inset-0 flex isolate gap-[var(--gap)] p-2 sm:p-[var(--gap)]"

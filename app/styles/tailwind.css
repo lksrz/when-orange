@@ -31,9 +31,50 @@
 		outline-offset: 0.25rem;
 		outline-color: theme('colors.orange[500]');
 	}
+
+	/* Mobile viewport height fixes */
+	:root {
+		--viewport-height: 100vh;
+		--viewport-height-small: 100svh;
+		--viewport-height-large: 100lvh;
+		--viewport-height-dynamic: 100dvh;
+	}
+
+	/* Support for newer viewport units when available */
+	@supports (height: 100svh) {
+		:root {
+			--viewport-height: 100dvh;
+		}
+	}
+
+	/* Fallback for older browsers */
+	@supports not (height: 100svh) {
+		:root {
+			--viewport-height: 100vh;
+		}
+
+		/* Update viewport height on resize to handle mobile browser UI changes */
+		body {
+			/* This will trigger height recalculation when mobile keyboard/browser UI changes */
+			min-height: -webkit-fill-available;
+		}
+	}
 }
 
 @layer utilities {
+	/* Mobile-safe viewport height utilities */
+	.h-mobile-screen {
+		height: var(--viewport-height);
+	}
+
+	.min-h-mobile-screen {
+		min-height: var(--viewport-height);
+	}
+
+	.max-h-mobile-screen {
+		max-height: var(--viewport-height);
+	}
+
 	.indication-shadow {
 		filter: drop-shadow(0 0 2px theme('colors.zinc[800]'))
 			drop-shadow(0 0 4px theme('colors.zinc[800]'));

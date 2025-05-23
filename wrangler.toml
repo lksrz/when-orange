@@ -22,7 +22,6 @@ TRANSCRIPTION_PROVIDER = "openai"
 TRANSCRIPTION_ENABLED = "false"
 AI_INVITE_ENABLED = "false"
 E2EE_ENABLED = "true"
-CALLS_APP_SECRET = "overrided_by_devvars_or_production_secret"
 
 [observability]
 enabled = true

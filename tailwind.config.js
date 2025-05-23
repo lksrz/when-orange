@@ -3,6 +3,15 @@ module.exports = {
 	content: ['./app/**/*.{js,jsx,ts,tsx}'],
 	theme: {
 		extend: {
+			height: {
+				'mobile-screen': 'var(--viewport-height)',
+			},
+			minHeight: {
+				'mobile-screen': 'var(--viewport-height)',
+			},
+			maxHeight: {
+				'mobile-screen': 'var(--viewport-height)',
+			},
 			keyframes: {
 				fadeIn: {
 					from: {

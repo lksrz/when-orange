@@ -10,6 +10,7 @@ import { EnsurePermissions } from '~/components/EnsurePermissions'
 import { Icon } from '~/components/Icon/Icon'
 import { Spinner } from '~/components/Spinner'
 
+import { useMobileViewportHeight } from '~/hooks/useMobileViewportHeight'
 import { usePeerConnection } from '~/hooks/usePeerConnection'
 import useRoom from '~/hooks/useRoom'
 import type { RoomContextType } from '~/hooks/useRoomContext'
@@ -88,10 +89,13 @@ function RoomPreparation() {
 	const userMedia = useUserMedia()
 	const room = useRoom({ roomName, userMedia })
 
+	// Initialize mobile viewport height handling for loading state
+	useMobileViewportHeight()
+
 	return room.roomState.meetingId ? (
 		<Room room={room} userMedia={userMedia} />
 	) : (
-		<div className="grid place-items-center h-[100vh]">
+		<div className="grid place-items-center h-mobile-screen">
 			<Spinner className="text-gray-500" />
 		</div>
 	)
