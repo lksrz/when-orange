@@ -15,6 +15,9 @@ const FILTERED_MESSAGES = [
 	'🔚 Closing pulled track',
 	'👩🏻‍⚕️ track is healthy!',
 	'Frame decryption failed: Not in a group, so decryption does not make sense',
+	'🛑 Stopping track',
+	'🙏🏻 Requesting',
+	'👩🏻‍⚕️ Checking track health',
 ]
 
 // Messages to throttle (show only every N seconds)

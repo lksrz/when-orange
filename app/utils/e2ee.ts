@@ -111,6 +111,8 @@ export class EncryptionWorker {
 	private _currentVideoMode: 'camera' | 'screenshare' | null = null
 	// Track our own track IDs to prevent self-decryption
 	private _ownTrackIds = new Set<string>()
+	// Track our own session ID for additional verification
+	private _ownSessionId: string | null = null
 
 	constructor(config: { id: string }) {
 		this.id = config.id
@@ -131,6 +133,7 @@ export class EncryptionWorker {
 		this._activeSenderTransforms.clear()
 		this._currentVideoMode = null
 		this._ownTrackIds.clear()
+		this._ownSessionId = null
 	}
 
 	// Check if a track ID belongs to us
@@ -146,6 +149,16 @@ export class EncryptionWorker {
 	// Remove a track ID from our own tracks
 	removeOwnTrack(trackId: string) {
 		this._ownTrackIds.delete(trackId)
+	}
+
+	// Set our own session ID for additional verification
+	setOwnSessionId(sessionId: string) {
+		this._ownSessionId = sessionId
+	}
+
+	// Check if a session ID belongs to us
+	isOwnSession(sessionId?: string): boolean {
+		return sessionId ? this._ownSessionId === sessionId : false
 	}
 
 	// Clean up a specific transform
@@ -372,10 +385,21 @@ export class EncryptionWorker {
 
 		// Check if this is our own track - if so, skip receiver transform setup
 		if (this.isOwnTrack(trackId)) {
+			console.log(
+				'🔐 Skipping receiver transform setup for own track:',
+				trackId,
+				'kind:',
+				trackKind
+			)
 			return
 		}
 
-		// Set up receiver transform for remote tracks silently
+		console.log(
+			'🔐 Setting up receiver transform for remote track:',
+			trackId,
+			'kind:',
+			trackKind
+		)
 
 		// If this is Firefox, we will have to use RTCRtpScriptTransform
 		if (window.RTCRtpScriptTransform) {
@@ -383,6 +407,10 @@ export class EncryptionWorker {
 				operation: 'decryptStream',
 			})
 
+			console.log(
+				'🔐 Successfully set up receiver transform (Firefox) for track:',
+				trackId
+			)
 			return
 		}
 
@@ -402,6 +430,10 @@ export class EncryptionWorker {
 				[readable, writable]
 			)
 
+			console.log(
+				'🔐 Successfully set up receiver transform (Chrome) for track:',
+				trackId
+			)
 			return
 		}
 
@@ -507,6 +539,14 @@ export function useE2EE({
 	const ownSession = useObservableAsValue(partyTracks.session$)
 	const ownSessionId = ownSession?.sessionId
 
+	// Set the session ID in the encryption worker when it becomes available
+	useEffect(() => {
+		if (ownSessionId) {
+			encryptionWorker.setOwnSessionId(ownSessionId)
+			console.log('🔐 Set own session ID in encryption worker:', ownSessionId)
+		}
+	}, [ownSessionId, encryptionWorker])
+
 	useEffect(() => {
 		return () => {
 			encryptionWorker.dispose()
@@ -584,6 +624,38 @@ export function useE2EE({
 
 		const subscription = partyTracks.transceiver$.subscribe((transceiver) => {
 			if (transceiver.direction === 'recvonly') {
+				// Get the session ID from the transceiver's mid
+				const mid = transceiver.mid
+				const trackId = transceiver.receiver.track?.id
+
+				// Skip if this is our own track by checking track ID
+				if (encryptionWorker.isOwnTrack(trackId)) {
+					console.log('🔐 Skipping receiver transform for own track:', trackId)
+					return
+				}
+
+				// Additional check: if we have our own session ID, compare it
+				if (ownSessionId && mid) {
+					// Check if this transceiver belongs to our own session
+					// This is a more robust check than just track ID
+					const transceiverSessionId = mid.split('-')[0] // Extract session prefix if present
+					if (transceiverSessionId === ownSessionId) {
+						console.log(
+							'🔐 Skipping receiver transform for own session:',
+							ownSessionId,
+							'mid:',
+							mid
+						)
+						return
+					}
+				}
+
+				console.log(
+					'🔐 Setting up receiver transform for remote track:',
+					trackId,
+					'mid:',
+					mid
+				)
 				encryptionWorker.setupReceiverTransform(transceiver.receiver)
 			}
 		})
@@ -591,7 +663,14 @@ export function useE2EE({
 		return () => {
 			subscription.unsubscribe()
 		}
-	}, [enabled, joined, workerReady, encryptionWorker, partyTracks.transceiver$])
+	}, [
+		enabled,
+		joined,
+		workerReady,
+		encryptionWorker,
+		partyTracks.transceiver$,
+		ownSessionId,
+	])
 
 	const onJoin = useCallback(
 		(firstUser: boolean) => {
