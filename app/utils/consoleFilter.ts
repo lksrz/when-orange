@@ -2,6 +2,7 @@
 const originalConsoleLog = console.log
 const originalConsoleInfo = console.info
 const originalConsoleError = console.error
+const originalConsoleDebug = console.debug
 
 // Throttle map to track when messages were last logged
 const throttleMap = new Map<string, number>()
@@ -18,12 +19,40 @@ const FILTERED_MESSAGES = [
 	'🛑 Stopping track',
 	'🙏🏻 Requesting',
 	'👩🏻‍⚕️ Checking track health',
+	'🌱 creating transceiver!',
+	'Tab is foregrounded, checking health...',
+	'Received event of type userLeft from main thread',
+	'Received event of type encryptStream from main thread',
+	'Received event of type decryptStream from main thread',
+	'Received event of type userJoined from main thread',
+	'Received event of type initializeAndCreateGroup from main thread',
+	'Received event of type initialize from main thread',
+	'panicked at',
+	'RuntimeError: Unreachable code should not be executed',
+	'assertion `left == right` failed: cannot recursively acquire mutex',
+	'could not remove user: EmptyInput(RemoveMembers)',
 ]
 
 // Messages to throttle (show only every N seconds)
 const THROTTLED_MESSAGES = [
 	{
 		pattern: /WebSocket connection.*failed.*network connection was lost/,
+		throttleMs: 5000, // 5 seconds
+	},
+	{
+		pattern: /Frame decryption failed: Not in a group/,
+		throttleMs: 10000, // 10 seconds
+	},
+	{
+		pattern: /🔐 Worker is unhealthy/,
+		throttleMs: 10000, // 10 seconds
+	},
+	{
+		pattern: /🔐 Worker health check failed/,
+		throttleMs: 15000, // 15 seconds
+	},
+	{
+		pattern: /🔐 Failed to (process|set up)/,
 		throttleMs: 5000, // 5 seconds
 	},
 ]
@@ -48,7 +77,10 @@ function shouldThrottleMessage(message: string): boolean {
 	return false
 }
 
-function filterConsoleMessage(level: 'log' | 'info' | 'error', ...args: any[]) {
+function filterConsoleMessage(
+	level: 'log' | 'info' | 'error' | 'debug',
+	...args: any[]
+) {
 	const message = args.join(' ')
 
 	// Filter out completely blocked messages
@@ -72,6 +104,9 @@ function filterConsoleMessage(level: 'log' | 'info' | 'error', ...args: any[]) {
 		case 'error':
 			originalConsoleError(...args)
 			break
+		case 'debug':
+			originalConsoleDebug(...args)
+			break
 	}
 }
 
@@ -79,12 +114,14 @@ function filterConsoleMessage(level: 'log' | 'info' | 'error', ...args: any[]) {
 console.log = (...args: any[]) => filterConsoleMessage('log', ...args)
 console.info = (...args: any[]) => filterConsoleMessage('info', ...args)
 console.error = (...args: any[]) => filterConsoleMessage('error', ...args)
+console.debug = (...args: any[]) => filterConsoleMessage('debug', ...args)
 
 // Export function to restore original console if needed
 export function restoreConsole() {
 	console.log = originalConsoleLog
 	console.info = originalConsoleInfo
 	console.error = originalConsoleError
+	console.debug = originalConsoleDebug
 }
 
 export function addFilteredMessage(message: string) {

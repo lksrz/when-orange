@@ -105,14 +105,8 @@ export class EncryptionWorker {
 	safetyNumber: number = -1
 	id: string
 	ready: boolean = false
-	// Track active sender transforms to avoid conflicts
-	private _activeSenderTransforms = new Map<string, RTCRtpSender>()
-	// Track the current video mode to ensure only one video sender is active
-	private _currentVideoMode: 'camera' | 'screenshare' | null = null
-	// Track our own track IDs to prevent self-decryption
-	private _ownTrackIds = new Set<string>()
-	// Track our own session ID for additional verification
-	private _ownSessionId: string | null = null
+	// Track which video sender is currently active to prevent conflicts
+	private _activeVideoSender: RTCRtpSender | null = null
 
 	constructor(config: { id: string }) {
 		this.id = config.id
@@ -130,90 +124,14 @@ export class EncryptionWorker {
 		this._worker?.terminate()
 		this._worker = null
 		this.ready = false
-		this._activeSenderTransforms.clear()
-		this._currentVideoMode = null
-		this._ownTrackIds.clear()
-		this._ownSessionId = null
-	}
-
-	// Check if a track ID belongs to us
-	isOwnTrack(trackId?: string): boolean {
-		return trackId ? this._ownTrackIds.has(trackId) : false
-	}
-
-	// Add a track ID to our own tracks
-	addOwnTrack(trackId: string) {
-		this._ownTrackIds.add(trackId)
-	}
-
-	// Remove a track ID from our own tracks
-	removeOwnTrack(trackId: string) {
-		this._ownTrackIds.delete(trackId)
-	}
-
-	// Set our own session ID for additional verification
-	setOwnSessionId(sessionId: string) {
-		this._ownSessionId = sessionId
-	}
-
-	// Check if a session ID belongs to us
-	isOwnSession(sessionId?: string): boolean {
-		return sessionId ? this._ownSessionId === sessionId : false
-	}
-
-	// Clean up a specific transform
-	cleanupSenderTransform(
-		trackKind: 'video' | 'audio' | 'camera' | 'screenshare'
-	) {
-		const sender = this._activeSenderTransforms.get(trackKind)
-		if (sender) {
-			if (sender.transform) {
-				sender.transform = null
-			}
-			this._activeSenderTransforms.delete(trackKind)
-		}
-	}
-
-	// Clean up all video transforms (both camera and screenshare)
-	cleanupAllVideoTransforms() {
-		this.cleanupSenderTransform('camera')
-		this.cleanupSenderTransform('screenshare')
-		// Legacy cleanup for old 'video' key
-		this.cleanupSenderTransform('video' as any)
-		this._currentVideoMode = null
-	}
-
-	// Get the current video mode
-	getCurrentVideoMode(): 'camera' | 'screenshare' | null {
-		return this._currentVideoMode
-	}
-
-	// Force cleanup of current video mode
-	cleanupCurrentVideoMode() {
-		if (this._currentVideoMode) {
-			this.cleanupSenderTransform(this._currentVideoMode)
-			this._currentVideoMode = null
-		}
-	}
-
-	// Get the currently active sender for a track kind
-	getActiveSender(
-		trackKind: 'video' | 'audio' | 'camera' | 'screenshare'
-	): RTCRtpSender | undefined {
-		return this._activeSenderTransforms.get(trackKind)
+		this._activeVideoSender = null
 	}
 
 	initialize() {
-		if (!this.ready) {
-			console.warn('🔐 Worker not ready yet, initialization may fail')
-		}
 		this.worker.postMessage({ type: 'initialize', id: this.id })
 	}
 
 	initializeAndCreateGroup() {
-		if (!this.ready) {
-			console.warn('🔐 Worker not ready yet, group creation may fail')
-		}
 		this.worker.postMessage({ type: 'initializeAndCreateGroup', id: this.id })
 	}
 
@@ -245,95 +163,47 @@ export class EncryptionWorker {
 	}
 
 	async setupSenderTransform(sender: RTCRtpSender) {
-		if (!this.ready) {
-			console.warn('🔐 Worker not ready, delaying sender transform setup')
-			// Wait for worker to be ready with timeout
-			let attempts = 0
-			const maxAttempts = 100 // 5 seconds maximum
-			while (!this.ready && attempts < maxAttempts) {
-				await new Promise((resolve) => setTimeout(resolve, 50))
-				attempts++
-			}
-
-			if (!this.ready) {
-				console.error(
-					'🔐 Worker failed to become ready within timeout, sender transform setup failed'
-				)
-				return
-			}
-		}
-
 		const trackKind = sender.track?.kind
 		const trackId = sender.track?.id
 
-		// Track this as our own track to prevent self-decryption
-		if (trackId) {
-			this.addOwnTrack(trackId)
+		// For video tracks, clean up previous sender if it exists
+		if (
+			trackKind === 'video' &&
+			this._activeVideoSender &&
+			this._activeVideoSender !== sender
+		) {
+			console.log('🔐 Cleaning up previous video sender transform')
+			if (this._activeVideoSender.transform) {
+				this._activeVideoSender.transform = null
+			}
+			// Wait a moment for cleanup
+			await new Promise((resolve) => setTimeout(resolve, 100))
 		}
 
-		// For video tracks, implement strict single-sender mode
-		if (trackKind === 'video') {
-			// Determine track type based on content hint or track characteristics
-			const track = sender.track
-			const isScreenShare =
-				track?.contentHint === 'text' ||
-				track?.contentHint === 'detail' ||
-				track?.getSettings().displaySurface !== undefined
-
-			const videoMode: 'camera' | 'screenshare' = isScreenShare
-				? 'screenshare'
-				: 'camera'
-
-			// If we're switching video modes, clean up the previous mode
-			if (this._currentVideoMode && this._currentVideoMode !== videoMode) {
-				// Clean up the previous video mode
-				const previousSender = this._activeSenderTransforms.get(
-					this._currentVideoMode
-				)
-				if (previousSender && previousSender.transform) {
-					// Remove the previous track from our own tracks when cleaning up
-					if (previousSender.track?.id) {
-						this.removeOwnTrack(previousSender.track.id)
-					}
-
-					previousSender.transform = null
-				}
-				this._activeSenderTransforms.delete(this._currentVideoMode)
-
-				// Wait for cleanup to complete
-				await new Promise((resolve) => setTimeout(resolve, 100))
-			}
-
-			// Check if we already have this exact sender set up
-			const existingSender = this._activeSenderTransforms.get(videoMode)
-			if (existingSender && existingSender !== sender) {
-				// Remove the existing track from our own tracks
-				if (existingSender.track?.id) {
-					this.removeOwnTrack(existingSender.track.id)
-				}
-
-				// Clear the existing transform
-				if (existingSender.transform) {
-					existingSender.transform = null
-				}
-
-				// Wait a brief moment to ensure the transform is fully cleared
-				await new Promise((resolve) => setTimeout(resolve, 100))
-			}
-
-			// Set up the new video mode
-			this._currentVideoMode = videoMode
-			this._activeSenderTransforms.set(videoMode, sender)
-		} else if (trackKind === 'audio') {
-			// Track audio sender (shouldn't conflict but good to track)
-			this._activeSenderTransforms.set('audio', sender)
-		}
+		console.log(
+			'🔐 Setting up sender transform for',
+			trackKind,
+			'trackId:',
+			trackId
+		)
 
 		// If this is Firefox, we will have to use RTCRtpScriptTransform
 		if (window.RTCRtpScriptTransform) {
 			sender.transform = new RTCRtpScriptTransform(this.worker, {
 				operation: 'encryptStream',
 			})
+
+			// Track video sender
+			if (trackKind === 'video') {
+				this._activeVideoSender = sender
+			}
+
+			console.log(
+				'🔐 Successfully set up sender transform for',
+				trackKind,
+				'trackId:',
+				trackId
+			)
 			return
 		}
 
@@ -353,6 +223,17 @@ export class EncryptionWorker {
 				[readable, writable]
 			)
 
+			// Track video sender
+			if (trackKind === 'video') {
+				this._activeVideoSender = sender
+			}
+
+			console.log(
+				'🔐 Successfully set up sender transform for',
+				trackKind,
+				'trackId:',
+				trackId
+			)
 			return
 		}
 
@@ -362,37 +243,8 @@ export class EncryptionWorker {
 	}
 
 	async setupReceiverTransform(receiver: RTCRtpReceiver) {
-		if (!this.ready) {
-			console.warn('🔐 Worker not ready, delaying receiver transform setup')
-			// Wait for worker to be ready with timeout
-			let attempts = 0
-			const maxAttempts = 100 // 5 seconds maximum
-			while (!this.ready && attempts < maxAttempts) {
-				await new Promise((resolve) => setTimeout(resolve, 50))
-				attempts++
-			}
-
-			if (!this.ready) {
-				console.error(
-					'🔐 Worker failed to become ready within timeout, receiver transform setup failed'
-				)
-				return
-			}
-		}
-
 		const trackId = receiver.track?.id
 		const trackKind = receiver.track?.kind
-
-		// Check if this is our own track - if so, skip receiver transform setup
-		if (this.isOwnTrack(trackId)) {
-			console.log(
-				'🔐 Skipping receiver transform setup for own track:',
-				trackId,
-				'kind:',
-				trackKind
-			)
-			return
-		}
 
 		console.log(
 			'🔐 Setting up receiver transform for remote track:',
@@ -535,17 +387,9 @@ export function useE2EE({
 	const [joined, setJoined] = useState(false)
 	const [firstUser, setFirstUser] = useState(false)
 
-	// Get our own session ID to avoid setting up receiver transforms for our own tracks
+	// Get our own session ID to check for self-decryption scenarios
 	const ownSession = useObservableAsValue(partyTracks.session$)
 	const ownSessionId = ownSession?.sessionId
-
-	// Set the session ID in the encryption worker when it becomes available
-	useEffect(() => {
-		if (ownSessionId) {
-			encryptionWorker.setOwnSessionId(ownSessionId)
-			console.log('🔐 Set own session ID in encryption worker:', ownSessionId)
-		}
-	}, [ownSessionId, encryptionWorker])
 
 	useEffect(() => {
 		return () => {
@@ -557,60 +401,39 @@ export function useE2EE({
 	useEffect(() => {
 		if (!enabled) return
 
-		const handleWorkerMessage = (event: MessageEvent) => {
-			if (event.data.type === 'workerReady') {
+		const checkReady = () => {
+			if (encryptionWorker.ready && !workerReady) {
 				setWorkerReady(true)
 			}
 		}
 
-		encryptionWorker.worker.addEventListener('message', handleWorkerMessage)
+		// Check immediately
+		checkReady()
+
+		// Check periodically until ready
+		const interval = setInterval(() => {
+			checkReady()
+		}, 100)
 
 		return () => {
-			encryptionWorker.worker.removeEventListener(
-				'message',
-				handleWorkerMessage
-			)
+			clearInterval(interval)
 		}
-	}, [enabled, encryptionWorker])
+	}, [enabled, encryptionWorker, workerReady])
 
 	useEffect(() => {
 		if (!enabled || !joined || !workerReady) return
 
-		let setupPromise = Promise.resolve()
-
 		const subscription = partyTracks.transceiver$.subscribe((transceiver) => {
 			if (transceiver.direction === 'sendonly') {
-				// Chain setup operations to avoid race conditions
-				setupPromise = setupPromise.then(async () => {
-					try {
-						if (transceiver.sender.track?.kind === 'video') {
-							const capability = RTCRtpSender.getCapabilities('video')
-							const codecs = capability ? capability.codecs : []
-							const vp9codec = codecs.filter(
-								(a) => a.mimeType === 'video/VP9' || a.mimeType === 'video/rtx'
-							)
-							transceiver.setCodecPreferences(vp9codec)
-						}
-
-						console.log(
-							'🔐 Setting up sender transform for',
-							transceiver.sender.track?.kind,
-							'trackId:',
-							transceiver.sender.track?.id
-						)
-
-						await encryptionWorker.setupSenderTransform(transceiver.sender)
-
-						console.log(
-							'🔐 Successfully set up sender transform for',
-							transceiver.sender.track?.kind,
-							'trackId:',
-							transceiver.sender.track?.id
-						)
-					} catch (error) {
-						console.error('🔐 Failed to set up sender transform:', error)
-					}
-				})
+				if (transceiver.sender.track?.kind === 'video') {
+					const capability = RTCRtpSender.getCapabilities('video')
+					const codecs = capability ? capability.codecs : []
+					const vp9codec = codecs.filter(
+						(a) => a.mimeType === 'video/VP9' || a.mimeType === 'video/rtx'
+					)
+					transceiver.setCodecPreferences(vp9codec)
+				}
+				encryptionWorker.setupSenderTransform(transceiver.sender)
 			}
 		})
 
@@ -624,38 +447,15 @@ export function useE2EE({
 
 		const subscription = partyTracks.transceiver$.subscribe((transceiver) => {
 			if (transceiver.direction === 'recvonly') {
-				// Get the session ID from the transceiver's mid
-				const mid = transceiver.mid
-				const trackId = transceiver.receiver.track?.id
-
-				// Skip if this is our own track by checking track ID
-				if (encryptionWorker.isOwnTrack(trackId)) {
-					console.log('🔐 Skipping receiver transform for own track:', trackId)
+				// Skip receiver transform if we're the only user in the room
+				const allUsers = room.otherUsers
+				if (allUsers.length === 0) {
+					console.log(
+						'🔐 Skipping receiver transform - we are the only user in the room'
+					)
 					return
 				}
 
-				// Additional check: if we have our own session ID, compare it
-				if (ownSessionId && mid) {
-					// Check if this transceiver belongs to our own session
-					// This is a more robust check than just track ID
-					const transceiverSessionId = mid.split('-')[0] // Extract session prefix if present
-					if (transceiverSessionId === ownSessionId) {
-						console.log(
-							'🔐 Skipping receiver transform for own session:',
-							ownSessionId,
-							'mid:',
-							mid
-						)
-						return
-					}
-				}
-
-				console.log(
-					'🔐 Setting up receiver transform for remote track:',
-					trackId,
-					'mid:',
-					mid
-				)
 				encryptionWorker.setupReceiverTransform(transceiver.receiver)
 			}
 		})
@@ -669,7 +469,7 @@ export function useE2EE({
 		workerReady,
 		encryptionWorker,
 		partyTracks.transceiver$,
-		ownSessionId,
+		room.otherUsers,
 	])
 
 	const onJoin = useCallback(
