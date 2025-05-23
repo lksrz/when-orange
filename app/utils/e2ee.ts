@@ -1,5 +1,4 @@
 import type { PartyTracks } from 'partytracks/client'
-import { useObservableAsValue } from 'partytracks/react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import invariant from 'tiny-invariant'
 import type useRoom from '~/hooks/useRoom'
@@ -105,8 +104,6 @@ export class EncryptionWorker {
 	safetyNumber: number = -1
 	id: string
 	ready: boolean = false
-	// Track which video sender is currently active to prevent conflicts
-	private _activeVideoSender: RTCRtpSender | null = null
 
 	constructor(config: { id: string }) {
 		this.id = config.id
@@ -124,7 +121,6 @@ export class EncryptionWorker {
 		this._worker?.terminate()
 		this._worker = null
 		this.ready = false
-		this._activeVideoSender = null
 	}
 
 	initialize() {
@@ -166,20 +162,6 @@ export class EncryptionWorker {
 		const trackKind = sender.track?.kind
 		const trackId = sender.track?.id
 
-		// For video tracks, clean up previous sender if it exists
-		if (
-			trackKind === 'video' &&
-			this._activeVideoSender &&
-			this._activeVideoSender !== sender
-		) {
-			console.log('🔐 Cleaning up previous video sender transform')
-			if (this._activeVideoSender.transform) {
-				this._activeVideoSender.transform = null
-			}
-			// Wait a moment for cleanup
-			await new Promise((resolve) => setTimeout(resolve, 100))
-		}
-
 		console.log(
 			'🔐 Setting up sender transform for',
 			trackKind,
@@ -192,11 +174,6 @@ export class EncryptionWorker {
 			sender.transform = new RTCRtpScriptTransform(this.worker, {
 				operation: 'encryptStream',
 			})
-
-			// Track video sender
-			if (trackKind === 'video') {
-				this._activeVideoSender = sender
-			}
 
 			console.log(
 				'🔐 Successfully set up sender transform for',
@@ -222,11 +199,6 @@ export class EncryptionWorker {
 				},
 				[readable, writable]
 			)
-
-			// Track video sender
-			if (trackKind === 'video') {
-				this._activeVideoSender = sender
-			}
 
 			console.log(
 				'🔐 Successfully set up sender transform for',
@@ -387,10 +359,6 @@ export function useE2EE({
 	const [joined, setJoined] = useState(false)
 	const [firstUser, setFirstUser] = useState(false)
 
-	// Get our own session ID to check for self-decryption scenarios
-	const ownSession = useObservableAsValue(partyTracks.session$)
-	const ownSessionId = ownSession?.sessionId
-
 	useEffect(() => {
 		return () => {
 			encryptionWorker.dispose()
@@ -447,30 +415,23 @@ export function useE2EE({
 
 		const subscription = partyTracks.transceiver$.subscribe((transceiver) => {
 			if (transceiver.direction === 'recvonly') {
-				// Skip receiver transform if we're the only user in the room
-				const allUsers = room.otherUsers
-				if (allUsers.length === 0) {
+				// Additional safety check: ensure receiver has a track before setting up transform
+				if (transceiver.receiver.track) {
 					console.log(
-						'🔐 Skipping receiver transform - we are the only user in the room'
+						'🔐 Setting up receiver transform for track:',
+						transceiver.receiver.track.id,
+						'mid:',
+						transceiver.mid
 					)
-					return
+					encryptionWorker.setupReceiverTransform(transceiver.receiver)
 				}
-
-				encryptionWorker.setupReceiverTransform(transceiver.receiver)
 			}
 		})
 
 		return () => {
 			subscription.unsubscribe()
 		}
-	}, [
-		enabled,
-		joined,
-		workerReady,
-		encryptionWorker,
-		partyTracks.transceiver$,
-		room.otherUsers,
-	])
+	}, [enabled, joined, workerReady, encryptionWorker, partyTracks.transceiver$])
 
 	const onJoin = useCallback(
 		(firstUser: boolean) => {
