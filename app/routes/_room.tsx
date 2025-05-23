@@ -41,6 +41,7 @@ export const loader = async ({ context }: LoaderFunctionArgs) => {
 			MAX_WEBCAM_QUALITY_LEVEL,
 			MAX_API_HISTORY,
 			E2EE_ENABLED,
+			EXPERIMENTAL_SIMULCAST_ENABLED,
 		},
 	} = context
 
@@ -59,6 +60,7 @@ export const loader = async ({ context }: LoaderFunctionArgs) => {
 		maxWebcamQualityLevel: numberOrUndefined(MAX_WEBCAM_QUALITY_LEVEL),
 		maxApiHistory: numberOrUndefined(MAX_API_HISTORY),
 		e2eeEnabled: E2EE_ENABLED === 'true',
+		simulcastEnabled: EXPERIMENTAL_SIMULCAST_ENABLED === 'true',
 	})
 }
 
@@ -141,6 +143,7 @@ function Room({ room, userMedia }: RoomProps) {
 		maxWebcamQualityLevel = 1080,
 		maxApiHistory = 100,
 		e2eeEnabled,
+		simulcastEnabled,
 	} = useLoaderData<typeof loader>()
 
 	const params = new URLSearchParams(apiExtraParams)
@@ -234,7 +237,7 @@ function Room({ room, userMedia }: RoomProps) {
 		roomHistory,
 		iceConnectionState,
 		room,
-		simulcastEnabled: false,
+		simulcastEnabled,
 		e2eeEnabled,
 		e2eeSafetyNumber,
 		e2eeReady,

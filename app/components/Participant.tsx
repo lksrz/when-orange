@@ -68,9 +68,8 @@ export const Participant = forwardRef<
 		showDebugInfo,
 		userMedia,
 		room: { identity },
-		e2eeEnabled,
-		e2eeSafetyNumber,
 		e2eeReady,
+		simulcastEnabled,
 	} = useRoomContext()
 	const peerConnection = useObservableAsValue(partyTracks.peerConnection$)
 	const id = user.id
@@ -83,8 +82,16 @@ export const Participant = forwardRef<
 	const pulledAudioTrack = usePulledAudioTrack(
 		isScreenShare ? undefined : user.tracks.audio
 	)
+	const shouldPullVideo = isScreenShare || (!isSelf && !dataSaverMode)
+	let preferredRid: string | undefined = undefined
+	if (!isScreenShare && simulcastEnabled) {
+		// If datasaver mode is off, we want server-side bandwidth estimation and switching
+		// so we will specify empty string to indicate we have no preferredRid
+		preferredRid = dataSaverMode ? 'b' : ''
+	}
 	const pulledVideoTrack = usePulledVideoTrack(
-		isScreenShare || (!isSelf && !dataSaverMode) ? user.tracks.video : undefined
+		shouldPullVideo ? user.tracks.video : undefined,
+		preferredRid
 	)
 	const audioTrack = isSelf ? userMedia.audioStreamTrack : pulledAudioTrack
 	const videoTrack =
@@ -143,7 +150,7 @@ export const Participant = forwardRef<
 						'relative max-w-[--participant-max-width] rounded-xl'
 					)}
 				>
-					{!isScreenShare && (
+					{!isScreenShare && !user.tracks.videoEnabled && (
 						<div
 							className={cn(
 								'absolute inset-0 h-full w-full grid place-items-center bg-gray-200'
@@ -185,6 +192,7 @@ export const Participant = forwardRef<
 						className={cn(
 							'absolute inset-0 h-full w-full object-contain opacity-0 transition-opacity',
 							isSelf && !isScreenShare && '-scale-x-100',
+							!isScreenShare && 'object-cover',
 							{
 								'opacity-100': isScreenShare
 									? user.tracks.screenShareEnabled

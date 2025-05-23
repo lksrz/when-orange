@@ -37,7 +37,7 @@ export function usePulledVideoTrack(
 						: of(undefined)
 				)
 			),
-		[partyTracks, trackObject$, preferredRid$]
+		[partyTracks, trackObject$, preferredRid$, simulcastEnabled]
 	)
 	return useObservableAsValue(pulledTrack$)
 }

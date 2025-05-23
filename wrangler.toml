@@ -22,6 +22,7 @@ TRANSCRIPTION_PROVIDER = "openai"
 TRANSCRIPTION_ENABLED = "false"
 AI_INVITE_ENABLED = "false"
 E2EE_ENABLED = "true"
+EXPERIMENTAL_SIMULCAST_ENABLED = "true"
 
 [observability]
 enabled = true
