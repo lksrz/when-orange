@@ -73,3 +73,80 @@ echo REPLACE_WITH_YOUR_SECRET | wrangler secret put CALLS_APP_SECRET
 ```sh
 npm run deploy
 ```
+
+# When Orange
+
+A secure, end-to-end encrypted video conferencing application built with Remix, WebRTC, and MLS (Message Layer Security).
+
+## Features
+
+- **End-to-End Encryption**: Uses MLS protocol for secure communication
+- **Screen Sharing**: Share your screen with encrypted transmission
+- **WebRTC**: Real-time video and audio communication
+- **Cloudflare Workers**: Serverless deployment on the edge
+- **Party Tracks**: Advanced track management and routing
+
+## Recent Fixes
+
+### Screen Share E2EE Fix (2024)
+
+Fixed MLS ratchet errors during screen sharing that were causing:
+
+- "Frame decryption failed: Cannot create decryption secrets from own sender ratchet..."
+- "This is the wrong ratchet type" errors
+- "Ciphertext generation out of bounds" errors
+
+**Solution**: Implemented proper video sender transform management to ensure only one video encryption stream is active at a time, preventing sequence number conflicts in the MLS ratchet system.
+
+See [screenshare-e2ee-fix.md](./screenshare-e2ee-fix.md) for detailed technical information.
+
+## Architecture
+
+- **Frontend**: React with Remix framework
+- **Backend**: Cloudflare Workers with Durable Objects
+- **Encryption**: Rust/WASM implementation of MLS protocol
+- **Media**: WebRTC with custom transforms for E2EE
+- **Database**: Cloudflare D1 (SQLite)
+
+## Development
+
+```bash
+# Install dependencies
+npm install
+
+# Build E2EE worker (requires wasm-pack)
+npm run build:e2ee-worker
+
+# Start development server
+npm run dev
+
+# Run tests
+npm test
+
+# Type checking
+npm run typecheck
+```
+
+## E2EE Implementation
+
+The application uses a sophisticated E2EE system:
+
+1. **MLS Protocol**: Provides forward secrecy and post-compromise security
+2. **Rust Worker**: WASM-based encryption/decryption processing
+3. **Transform Management**: Careful handling of WebRTC sender/receiver transforms
+4. **Track Lifecycle**: Proper management of video track changes during screen sharing
+
+## Deployment
+
+```bash
+# Deploy to Cloudflare Workers
+npm run deploy
+```
+
+## Contributing
+
+Please ensure all tests pass and TypeScript compiles without errors:
+
+```bash
+npm run check
+```

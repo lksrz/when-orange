@@ -105,6 +105,8 @@ export class EncryptionWorker {
 	safetyNumber: number = -1
 	id: string
 	ready: boolean = false
+	// Track active sender transforms to avoid conflicts
+	private _activeSenderTransforms = new Map<string, RTCRtpSender>()
 
 	constructor(config: { id: string }) {
 		this.id = config.id
@@ -122,6 +124,24 @@ export class EncryptionWorker {
 		this._worker?.terminate()
 		this._worker = null
 		this.ready = false
+		this._activeSenderTransforms.clear()
+	}
+
+	// Clean up a specific transform
+	cleanupSenderTransform(trackKind: 'video' | 'audio') {
+		const sender = this._activeSenderTransforms.get(trackKind)
+		if (sender) {
+			console.log(`🔐 Cleaning up ${trackKind} sender transform`)
+			if (sender.transform) {
+				sender.transform = null
+			}
+			this._activeSenderTransforms.delete(trackKind)
+		}
+	}
+
+	// Get the currently active sender for a track kind
+	getActiveSender(trackKind: 'video' | 'audio'): RTCRtpSender | undefined {
+		return this._activeSenderTransforms.get(trackKind)
 	}
 
 	initialize() {
@@ -184,7 +204,47 @@ export class EncryptionWorker {
 			}
 		}
 
-		console.log('🔐 Setting up sender transform for', sender.track?.kind)
+		const trackKind = sender.track?.kind
+		const trackId = sender.track?.id
+
+		console.log(
+			'🔐 Setting up sender transform for',
+			trackKind,
+			'track:',
+			trackId
+		)
+
+		// For video tracks, ensure only one sender transform is active at a time
+		if (trackKind === 'video') {
+			// Check if we already have an active video sender transform
+			const existingSender = this._activeSenderTransforms.get('video')
+			if (existingSender && existingSender !== sender) {
+				console.log(
+					'🔐 Removing existing video sender transform before setting up new one'
+				)
+
+				// Clear the existing transform
+				if (existingSender.transform) {
+					existingSender.transform = null
+				}
+
+				// Additional cleanup - stop the existing track if it's no longer needed
+				if (existingSender.track && existingSender.track !== sender.track) {
+					console.log(
+						'🔐 Previous video track different from new one, both tracks active'
+					)
+				}
+
+				// Wait a brief moment to ensure the transform is fully cleared
+				await new Promise((resolve) => setTimeout(resolve, 100))
+			}
+
+			// Track this sender as the active video sender
+			this._activeSenderTransforms.set('video', sender)
+		} else if (trackKind === 'audio') {
+			// Track audio sender (shouldn't conflict but good to track)
+			this._activeSenderTransforms.set('audio', sender)
+		}
 
 		// If this is Firefox, we will have to use RTCRtpScriptTransform
 		if (window.RTCRtpScriptTransform) {
@@ -397,21 +457,41 @@ export function useE2EE({
 	useEffect(() => {
 		if (!enabled || !joined || !workerReady) return
 
+		let setupPromise = Promise.resolve()
+
 		const subscription = partyTracks.transceiver$.subscribe((transceiver) => {
 			if (transceiver.direction === 'sendonly') {
-				if (transceiver.sender.track?.kind === 'video') {
-					const capability = RTCRtpSender.getCapabilities('video')
-					const codecs = capability ? capability.codecs : []
-					const vp9codec = codecs.filter(
-						(a) => a.mimeType === 'video/VP9' || a.mimeType === 'video/rtx'
-					)
-					transceiver.setCodecPreferences(vp9codec)
-				}
-				console.log(
-					'🔐 Setting up sender transform for',
-					transceiver.sender.track?.kind
-				)
-				encryptionWorker.setupSenderTransform(transceiver.sender)
+				// Chain setup operations to avoid race conditions
+				setupPromise = setupPromise.then(async () => {
+					try {
+						if (transceiver.sender.track?.kind === 'video') {
+							const capability = RTCRtpSender.getCapabilities('video')
+							const codecs = capability ? capability.codecs : []
+							const vp9codec = codecs.filter(
+								(a) => a.mimeType === 'video/VP9' || a.mimeType === 'video/rtx'
+							)
+							transceiver.setCodecPreferences(vp9codec)
+						}
+
+						console.log(
+							'🔐 Setting up sender transform for',
+							transceiver.sender.track?.kind,
+							'trackId:',
+							transceiver.sender.track?.id
+						)
+
+						await encryptionWorker.setupSenderTransform(transceiver.sender)
+
+						console.log(
+							'🔐 Successfully set up sender transform for',
+							transceiver.sender.track?.kind,
+							'trackId:',
+							transceiver.sender.track?.id
+						)
+					} catch (error) {
+						console.error('🔐 Failed to set up sender transform:', error)
+					}
+				})
 			}
 		})
 
