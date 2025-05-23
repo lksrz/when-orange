@@ -31,7 +31,8 @@
       "Bash(/Users/lukasz/.nvm/versions/node/v18.20.4/lib/node_modules/@anthropic-ai/claude-code/vendor/ripgrep/arm64-darwin/rg \"e2eeOnJoin\" --type tsx)",
       "Bash(/Users/lukasz/.nvm/versions/node/v18.20.4/lib/node_modules/@anthropic-ai/claude-code/vendor/ripgrep/arm64-darwin/rg \"e2eeOnJoin\" app/)",
       "Bash(/Users/lukasz/.nvm/versions/node/v18.20.4/lib/node_modules/@anthropic-ai/claude-code/vendor/ripgrep/arm64-darwin/rg \"e2eeOnJoin\\(\" app/)",
-      "Bash(/Users/lukasz/.nvm/versions/node/v18.20.4/lib/node_modules/@anthropic-ai/claude-code/vendor/ripgrep/arm64-darwin/rg \"\\.e2eeOnJoin\" app/)"
+      "Bash(/Users/lukasz/.nvm/versions/node/v18.20.4/lib/node_modules/@anthropic-ai/claude-code/vendor/ripgrep/arm64-darwin/rg \"\\.e2eeOnJoin\" app/)",
+      "Bash(git checkout:*)"
     ],
     "deny": []
   }
