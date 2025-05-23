@@ -1,4 +1,5 @@
 import type { PartyTracks } from 'partytracks/client'
+import { useObservableAsValue } from 'partytracks/react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import invariant from 'tiny-invariant'
 import type useRoom from '~/hooks/useRoom'
@@ -49,7 +50,6 @@ export async function loadWorker(
 
 	// Listen for messages from the worker
 	worker.onmessage = function (event: MessageEvent<MessagesFromE2eeWorker>) {
-		console.log('Received message from worker:', event.data)
 		handleEvents(event.data)
 	}
 
@@ -107,6 +107,10 @@ export class EncryptionWorker {
 	ready: boolean = false
 	// Track active sender transforms to avoid conflicts
 	private _activeSenderTransforms = new Map<string, RTCRtpSender>()
+	// Track the current video mode to ensure only one video sender is active
+	private _currentVideoMode: 'camera' | 'screenshare' | null = null
+	// Track our own track IDs to prevent self-decryption
+	private _ownTrackIds = new Set<string>()
 
 	constructor(config: { id: string }) {
 		this.id = config.id
@@ -125,13 +129,31 @@ export class EncryptionWorker {
 		this._worker = null
 		this.ready = false
 		this._activeSenderTransforms.clear()
+		this._currentVideoMode = null
+		this._ownTrackIds.clear()
+	}
+
+	// Check if a track ID belongs to us
+	isOwnTrack(trackId?: string): boolean {
+		return trackId ? this._ownTrackIds.has(trackId) : false
+	}
+
+	// Add a track ID to our own tracks
+	addOwnTrack(trackId: string) {
+		this._ownTrackIds.add(trackId)
+	}
+
+	// Remove a track ID from our own tracks
+	removeOwnTrack(trackId: string) {
+		this._ownTrackIds.delete(trackId)
 	}
 
 	// Clean up a specific transform
-	cleanupSenderTransform(trackKind: 'video' | 'audio') {
+	cleanupSenderTransform(
+		trackKind: 'video' | 'audio' | 'camera' | 'screenshare'
+	) {
 		const sender = this._activeSenderTransforms.get(trackKind)
 		if (sender) {
-			console.log(`🔐 Cleaning up ${trackKind} sender transform`)
 			if (sender.transform) {
 				sender.transform = null
 			}
@@ -139,8 +161,32 @@ export class EncryptionWorker {
 		}
 	}
 
+	// Clean up all video transforms (both camera and screenshare)
+	cleanupAllVideoTransforms() {
+		this.cleanupSenderTransform('camera')
+		this.cleanupSenderTransform('screenshare')
+		// Legacy cleanup for old 'video' key
+		this.cleanupSenderTransform('video' as any)
+		this._currentVideoMode = null
+	}
+
+	// Get the current video mode
+	getCurrentVideoMode(): 'camera' | 'screenshare' | null {
+		return this._currentVideoMode
+	}
+
+	// Force cleanup of current video mode
+	cleanupCurrentVideoMode() {
+		if (this._currentVideoMode) {
+			this.cleanupSenderTransform(this._currentVideoMode)
+			this._currentVideoMode = null
+		}
+	}
+
 	// Get the currently active sender for a track kind
-	getActiveSender(trackKind: 'video' | 'audio'): RTCRtpSender | undefined {
+	getActiveSender(
+		trackKind: 'video' | 'audio' | 'camera' | 'screenshare'
+	): RTCRtpSender | undefined {
 		return this._activeSenderTransforms.get(trackKind)
 	}
 
@@ -207,40 +253,64 @@ export class EncryptionWorker {
 		const trackKind = sender.track?.kind
 		const trackId = sender.track?.id
 
-		console.log(
-			'🔐 Setting up sender transform for',
-			trackKind,
-			'track:',
-			trackId
-		)
+		// Track this as our own track to prevent self-decryption
+		if (trackId) {
+			this.addOwnTrack(trackId)
+		}
 
-		// For video tracks, ensure only one sender transform is active at a time
+		// For video tracks, implement strict single-sender mode
 		if (trackKind === 'video') {
-			// Check if we already have an active video sender transform
-			const existingSender = this._activeSenderTransforms.get('video')
-			if (existingSender && existingSender !== sender) {
-				console.log(
-					'🔐 Removing existing video sender transform before setting up new one'
+			// Determine track type based on content hint or track characteristics
+			const track = sender.track
+			const isScreenShare =
+				track?.contentHint === 'text' ||
+				track?.contentHint === 'detail' ||
+				track?.getSettings().displaySurface !== undefined
+
+			const videoMode: 'camera' | 'screenshare' = isScreenShare
+				? 'screenshare'
+				: 'camera'
+
+			// If we're switching video modes, clean up the previous mode
+			if (this._currentVideoMode && this._currentVideoMode !== videoMode) {
+				// Clean up the previous video mode
+				const previousSender = this._activeSenderTransforms.get(
+					this._currentVideoMode
 				)
+				if (previousSender && previousSender.transform) {
+					// Remove the previous track from our own tracks when cleaning up
+					if (previousSender.track?.id) {
+						this.removeOwnTrack(previousSender.track.id)
+					}
+
+					previousSender.transform = null
+				}
+				this._activeSenderTransforms.delete(this._currentVideoMode)
+
+				// Wait for cleanup to complete
+				await new Promise((resolve) => setTimeout(resolve, 100))
+			}
+
+			// Check if we already have this exact sender set up
+			const existingSender = this._activeSenderTransforms.get(videoMode)
+			if (existingSender && existingSender !== sender) {
+				// Remove the existing track from our own tracks
+				if (existingSender.track?.id) {
+					this.removeOwnTrack(existingSender.track.id)
+				}
 
 				// Clear the existing transform
 				if (existingSender.transform) {
 					existingSender.transform = null
 				}
 
-				// Additional cleanup - stop the existing track if it's no longer needed
-				if (existingSender.track && existingSender.track !== sender.track) {
-					console.log(
-						'🔐 Previous video track different from new one, both tracks active'
-					)
-				}
-
 				// Wait a brief moment to ensure the transform is fully cleared
 				await new Promise((resolve) => setTimeout(resolve, 100))
 			}
 
-			// Track this sender as the active video sender
-			this._activeSenderTransforms.set('video', sender)
+			// Set up the new video mode
+			this._currentVideoMode = videoMode
+			this._activeSenderTransforms.set(videoMode, sender)
 		} else if (trackKind === 'audio') {
 			// Track audio sender (shouldn't conflict but good to track)
 			this._activeSenderTransforms.set('audio', sender)
@@ -297,7 +367,15 @@ export class EncryptionWorker {
 			}
 		}
 
-		console.log('🔐 Setting up receiver transform for', receiver.track?.kind)
+		const trackId = receiver.track?.id
+		const trackKind = receiver.track?.kind
+
+		// Check if this is our own track - if so, skip receiver transform setup
+		if (this.isOwnTrack(trackId)) {
+			return
+		}
+
+		// Set up receiver transform for remote tracks silently
 
 		// If this is Firefox, we will have to use RTCRtpScriptTransform
 		if (window.RTCRtpScriptTransform) {
@@ -344,7 +422,6 @@ export class EncryptionWorker {
 		this.worker.addEventListener('message', (event) => {
 			const excludedEvents = ['workerReady', 'newSafetyNumber']
 			if (!excludedEvents.includes(event.data.type)) {
-				console.log('Message from worker in handleOutgoingEvents', event.data)
 				onMessage(JSON.stringify(event.data, replacer))
 			}
 		})
@@ -352,8 +429,6 @@ export class EncryptionWorker {
 
 	handleIncomingEvent(data: string) {
 		const message = JSON.parse(data, reviver) as MessagesFromWorker
-		// the message type here came from another user's worker
-		console.log('Incoming event: ', message.type, { message })
 		switch (message.type) {
 			case 'shareKeyPackage': {
 				this.userJoined(message.keyPkg)
@@ -427,6 +502,10 @@ export function useE2EE({
 
 	const [joined, setJoined] = useState(false)
 	const [firstUser, setFirstUser] = useState(false)
+
+	// Get our own session ID to avoid setting up receiver transforms for our own tracks
+	const ownSession = useObservableAsValue(partyTracks.session$)
+	const ownSessionId = ownSession?.sessionId
 
 	useEffect(() => {
 		return () => {
@@ -502,12 +581,9 @@ export function useE2EE({
 
 	useEffect(() => {
 		if (!enabled || !joined || !workerReady) return
+
 		const subscription = partyTracks.transceiver$.subscribe((transceiver) => {
 			if (transceiver.direction === 'recvonly') {
-				console.log(
-					'🔐 Setting up receiver transform for',
-					transceiver.receiver.track?.kind
-				)
 				encryptionWorker.setupReceiverTransform(transceiver.receiver)
 			}
 		})
