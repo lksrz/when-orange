@@ -1,10 +1,32 @@
-import { redirect, type ActionFunctionArgs } from '@remix-run/cloudflare'
+import {
+	redirect,
+	type ActionFunctionArgs,
+	type LoaderFunctionArgs,
+} from '@remix-run/cloudflare'
 import { Form } from '@remix-run/react'
 import invariant from 'tiny-invariant'
 import { Button } from '~/components/Button'
 import { Input } from '~/components/Input'
 import { ACCESS_AUTHENTICATED_USER_EMAIL_HEADER } from '~/utils/constants'
 import { setUsername } from '~/utils/getUsername.server'
+
+export const loader = async ({ request }: LoaderFunctionArgs) => {
+	const url = new URL(request.url)
+	const username = url.searchParams.get('username')
+	const returnUrl = url.searchParams.get('return-url') ?? '/'
+
+	const accessUsername = request.headers.get(
+		ACCESS_AUTHENTICATED_USER_EMAIL_HEADER
+	)
+	if (accessUsername) throw redirect(returnUrl)
+
+	// If username is provided in URL, set it automatically and redirect
+	if (username) {
+		return setUsername(username, request, returnUrl)
+	}
+
+	return null
+}
 
 export const action = async ({ request }: ActionFunctionArgs) => {
 	const url = new URL(request.url)

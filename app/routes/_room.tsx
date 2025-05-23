@@ -17,8 +17,8 @@ import { useRoomHistory } from '~/hooks/useRoomHistory'
 import { useStablePojo } from '~/hooks/useStablePojo'
 import useUserMedia from '~/hooks/useUserMedia'
 import type { TrackObject } from '~/utils/callsTypes'
-import { getIceServers } from '~/utils/getIceServers.server'
 import { useE2EE } from '~/utils/e2ee'
+import { getIceServers } from '~/utils/getIceServers.server'
 
 function numberOrUndefined(value: unknown): number | undefined {
 	const num = Number(value)
@@ -169,9 +169,10 @@ function Room({ room, userMedia }: RoomProps) {
 	const videoTrackEncodingParams$ =
 		useValueAsObservable<RTCRtpEncodingParameters[]>(videoEncodingParams)
 	const pushedVideoTrack$ = useMemo(
-		() => partyTracks.push(userMedia.videoTrack$, {
-			sendEncodings$: videoTrackEncodingParams$,
-		}),
+		() =>
+			partyTracks.push(userMedia.videoTrack$, {
+				sendEncodings$: videoTrackEncodingParams$,
+			}),
 		[partyTracks, userMedia.videoTrack$, videoTrackEncodingParams$]
 	)
 
@@ -202,7 +203,7 @@ function Room({ room, userMedia }: RoomProps) {
 	)
 	const [pinnedTileIds, setPinnedTileIds] = useState<string[]>([])
 	const [showDebugInfo, setShowDebugInfo] = useState(false)
-	
+
 	// E2EE integration
 	const { e2eeSafetyNumber, onJoin } = useE2EE({
 		enabled: e2eeEnabled,

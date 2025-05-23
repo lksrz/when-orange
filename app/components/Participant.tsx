@@ -22,6 +22,7 @@ import {
 	ConnectionIndicator,
 	getConnectionQuality,
 } from './ConnectionIndicator'
+import { E2EEIndicator } from './E2EEIndicator'
 import { HoverFade } from './HoverFade'
 import { Icon } from './Icon/Icon'
 import { MuteUserButton } from './MuteUserButton'
@@ -29,7 +30,6 @@ import { OptionalLink } from './OptionalLink'
 import { usePulledAudioTrack } from './PullAudioTracks'
 import { Tooltip } from './Tooltip'
 import { VideoSrcObject } from './VideoSrcObject'
-import { E2EEIndicator } from './E2EEIndicator'
 
 function useMid(track?: MediaStreamTrack) {
 	const { partyTracks } = useRoomContext()

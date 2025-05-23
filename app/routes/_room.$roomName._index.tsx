@@ -1,6 +1,6 @@
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden'
 import type { LoaderFunctionArgs } from '@remix-run/cloudflare'
-import { json } from '@remix-run/cloudflare'
+import { json, redirect } from '@remix-run/cloudflare'
 import { useNavigate, useParams, useSearchParams } from '@remix-run/react'
 import { useObservableAsValue } from 'partytracks/react'
 import invariant from 'tiny-invariant'
@@ -20,6 +20,20 @@ import { useRoomUrl } from '~/hooks/useRoomUrl'
 import getUsername from '~/utils/getUsername.server'
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
+	const url = new URL(request.url)
+	const usernameParam = url.searchParams.get('username')
+
+	// If username parameter is provided but user doesn't have a username set,
+	// redirect to set-username to set it automatically
+	if (usernameParam) {
+		const currentUsername = await getUsername(request)
+		if (!currentUsername) {
+			const returnUrl = url.pathname + url.search
+			const setUsernameUrl = `/set-username?username=${encodeURIComponent(usernameParam)}&return-url=${encodeURIComponent(returnUrl)}`
+			throw redirect(setUsernameUrl)
+		}
+	}
+
 	const username = await getUsername(request)
 	invariant(username)
 	return json({ username, callsAppId: context.env.CALLS_APP_ID })

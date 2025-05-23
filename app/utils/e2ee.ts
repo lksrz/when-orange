@@ -334,7 +334,10 @@ export function useE2EE({
 					)
 					transceiver.setCodecPreferences(vp9codec)
 				}
-				console.log('🔐 Setting up sender transform for', transceiver.sender.track?.kind)
+				console.log(
+					'🔐 Setting up sender transform for',
+					transceiver.sender.track?.kind
+				)
 				encryptionWorker.setupSenderTransform(transceiver.sender)
 			}
 		})
@@ -348,7 +351,10 @@ export function useE2EE({
 		if (!enabled || !joined) return
 		const subscription = partyTracks.transceiver$.subscribe((transceiver) => {
 			if (transceiver.direction === 'recvonly') {
-				console.log('🔐 Setting up receiver transform for', transceiver.receiver.track?.kind)
+				console.log(
+					'🔐 Setting up receiver transform for',
+					transceiver.receiver.track?.kind
+				)
 				encryptionWorker.setupReceiverTransform(transceiver.receiver)
 			}
 		})

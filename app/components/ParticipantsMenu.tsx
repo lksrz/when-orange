@@ -3,7 +3,6 @@ import { useRoomContext } from '~/hooks/useRoomContext'
 import { useUserMetadata } from '~/hooks/useUserMetadata'
 import type { User } from '~/types/Messages'
 import populateTraceLink from '~/utils/populateTraceLink'
-import { cn } from '~/utils/style'
 import { AudioIndicator } from './AudioIndicator'
 import { Button } from './Button'
 import { Dialog, DialogContent, DialogOverlay, Portal, Trigger } from './Dialog'
@@ -73,7 +72,10 @@ export const ParticipantsButton: FC<
 		<ParticipantsDialog {...rest}>
 			<Tooltip content={participantCount(otherUsers.length + 1)}>
 				<Trigger asChild>
-					<Button className="flex items-center gap-2 text-xs" displayType="secondary">
+					<Button
+						className="flex items-center gap-2 text-xs"
+						displayType="secondary"
+					>
 						<span className="hidden lg:inline">Participants</span>
 						<Icon type="userGroup" />
 					</Button>

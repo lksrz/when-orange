@@ -1,4 +1,3 @@
-import { VisuallyHidden } from '@radix-ui/react-visually-hidden'
 import type { FC } from 'react'
 import { useState } from 'react'
 import { useRoomContext } from '~/hooks/useRoomContext'
@@ -28,7 +27,10 @@ export const OverflowMenu: FC<OverflowMenuProps> = ({ bugReportsEnabled }) => {
 		<>
 			<DropdownMenu.Root>
 				<DropdownMenu.Trigger asChild>
-					<Button displayType="secondary" className="flex items-center gap-2 text-xs">
+					<Button
+						displayType="secondary"
+						className="flex items-center gap-2 text-xs"
+					>
 						<span className="hidden md:inline">Options</span>
 						<Icon type="cog" />
 					</Button>
@@ -38,7 +40,10 @@ export const OverflowMenu: FC<OverflowMenuProps> = ({ bugReportsEnabled }) => {
 						<DropdownMenu.Item
 							onSelect={() => setDataSaverMode(!dataSaverMode)}
 						>
-							<Icon type={dataSaverMode ? 'videoOn' : 'videoOff'} className="mr-2" />
+							<Icon
+								type={dataSaverMode ? 'videoOn' : 'videoOff'}
+								className="mr-2"
+							/>
 							{dataSaverMode ? 'Show other cameras' : 'Hide other cameras'}
 						</DropdownMenu.Item>
 						<DropdownMenu.Item

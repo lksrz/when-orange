@@ -1,4 +1,3 @@
-import { VisuallyHidden } from '@radix-ui/react-visually-hidden'
 import { useNavigate } from '@remix-run/react'
 import type { FC } from 'react'
 import { Button } from './Button'

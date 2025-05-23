@@ -29,6 +29,9 @@ export default defineConfig({
 
 		/* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
 		trace: 'on-first-retry',
+
+		/* Grant permissions for microphone and camera */
+		permissions: ['microphone', 'camera'],
 	},
 
 	/* Configure projects for major browsers */
@@ -43,6 +46,8 @@ export default defineConfig({
 						'--disable-web-security',
 						'--use-fake-ui-for-media-stream',
 						'--use-fake-device-for-media-stream',
+						'--allow-running-insecure-content',
+						'--autoplay-policy=no-user-gesture-required',
 					],
 				},
 			},

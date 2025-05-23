@@ -1,12 +1,12 @@
 import type { LoaderFunctionArgs } from '@remix-run/cloudflare'
-import { json } from '@remix-run/cloudflare'
+import { json, redirect } from '@remix-run/cloudflare'
 import {
 	useLoaderData,
 	useNavigate,
 	useParams,
 	useSearchParams,
 } from '@remix-run/react'
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useMount, useWindowSize } from 'react-use'
 import invariant from 'tiny-invariant'
 import { AiButton } from '~/components/AiButton'
@@ -18,10 +18,15 @@ import { LeaveRoomButton } from '~/components/LeaveRoomButton'
 import { MicButton } from '~/components/MicButton'
 import { OverflowMenu } from '~/components/OverflowMenu'
 import { ParticipantLayout } from '~/components/ParticipantLayout'
-import { PullAudioTracks } from '~/components/PullAudioTracks'
+import {
+	PullAudioTracks,
+	usePulledAudioTracks,
+} from '~/components/PullAudioTracks'
 import { RaiseHandButton } from '~/components/RaiseHandButton'
 import { ScreenshareButton } from '~/components/ScreenshareButton'
 import Toast from '~/components/Toast'
+import { TranscriptionPanel } from '~/components/TranscriptionPanel'
+import { TranscriptionService } from '~/components/TranscriptionService'
 import useBroadcastStatus from '~/hooks/useBroadcastStatus'
 import useIsSpeaking from '~/hooks/useIsSpeaking'
 import { useRoomContext } from '~/hooks/useRoomContext'
@@ -31,11 +36,22 @@ import useStageManager from '~/hooks/useStageManager'
 import { useUserJoinLeaveToasts } from '~/hooks/useUserJoinLeaveToasts'
 import getUsername from '~/utils/getUsername.server'
 import isNonNullable from '~/utils/isNonNullable'
-import { TranscriptionService } from "~/components/TranscriptionService";
-import { TranscriptionPanel } from "~/components/TranscriptionPanel";
-import { usePulledAudioTracks } from "~/components/PullAudioTracks";
 
 export const loader = async ({ request, context }: LoaderFunctionArgs) => {
+	const url = new URL(request.url)
+	const usernameParam = url.searchParams.get('username')
+
+	// If username parameter is provided but user doesn't have a username set,
+	// redirect to set-username to set it automatically
+	if (usernameParam) {
+		const currentUsername = await getUsername(request)
+		if (!currentUsername) {
+			const returnUrl = url.pathname + url.search
+			const setUsernameUrl = `/set-username?username=${encodeURIComponent(usernameParam)}&return-url=${encodeURIComponent(returnUrl)}`
+			throw redirect(setUsernameUrl)
+		}
+	}
+
 	const username = await getUsername(request)
 
 	return json({
@@ -88,7 +104,15 @@ function JoinedRoom({
 	bugReportsEnabled: boolean
 	roomName: string
 }) {
-	const { hasDb, hasAiCredentials, transcriptionProvider, hasOpenAiTranscription, transcriptionEnabled, aiInviteEnabled, e2eeEnabled } = useLoaderData<typeof loader>()
+	const {
+		hasDb,
+		hasAiCredentials,
+		transcriptionProvider,
+		hasOpenAiTranscription,
+		transcriptionEnabled,
+		aiInviteEnabled,
+		e2eeEnabled,
+	} = useLoaderData<typeof loader>()
 	const {
 		userMedia,
 		partyTracks,
@@ -119,7 +143,12 @@ function JoinedRoom({
 	useEffect(() => {
 		if (e2eeEnabled && identity) {
 			const isFirstUser = otherUsers.length === 0
-			console.log('🔐 Calling e2eeOnJoin with firstUser:', isFirstUser, 'identity:', identity.id)
+			console.log(
+				'🔐 Calling e2eeOnJoin with firstUser:',
+				isFirstUser,
+				'identity:',
+				identity.id
+			)
 			e2eeOnJoin(isFirstUser)
 		}
 	}, [e2eeEnabled, identity?.id, e2eeOnJoin]) // Only call once when identity is established
@@ -179,11 +208,11 @@ function JoinedRoom({
 		if (otherUsers.length === 0) {
 			return true // You're alone, so you're the host
 		}
-		
+
 		// Create a list of all users (including yourself) and sort by ID for consistency
-		const allUsers = [...otherUsers, { id: identity?.id }].filter(u => u.id)
+		const allUsers = [...otherUsers, { id: identity?.id }].filter((u) => u.id)
 		allUsers.sort((a, b) => (a.id || '').localeCompare(b.id || ''))
-		
+
 		return allUsers[0]?.id === identity?.id
 	}, [otherUsers, identity])
 
@@ -196,30 +225,30 @@ function JoinedRoom({
 
 	// Get actual audio tracks from PullAudioTracks context
 	const pulledAudioTracks = usePulledAudioTracks()
-	
+
 	// Convert track IDs to actual MediaStreamTrack objects and include own microphone
 	const actualAudioTracks = useMemo(() => {
 		const remoteTracks = allRemoteAudioTrackIds
-			.map(trackId => pulledAudioTracks[trackId])
+			.map((trackId) => pulledAudioTracks[trackId])
 			.filter((track): track is MediaStreamTrack => track !== undefined)
-		
+
 		// Add user's own audio track if available
 		if (userMedia.audioStreamTrack) {
 			remoteTracks.push(userMedia.audioStreamTrack)
 		}
-		
+
 		return remoteTracks
 	}, [allRemoteAudioTrackIds, pulledAudioTracks, userMedia.audioStreamTrack])
 
-       const [showTranscription, setShowTranscription] = useState(false)
+	const [showTranscription, setShowTranscription] = useState(false)
 
-       const participantNames = useMemo(
-               () => [
-                       identity?.name,
-                       ...otherUsers.map((u) => u.name),
-               ].filter(Boolean) as string[],
-               [identity?.name, otherUsers]
-       )
+	const participantNames = useMemo(
+		() =>
+			[identity?.name, ...otherUsers.map((u) => u.name)].filter(
+				Boolean
+			) as string[],
+		[identity?.name, otherUsers]
+	)
 
 	return (
 		<PullAudioTracks
@@ -228,7 +257,7 @@ function JoinedRoom({
 			<div className="h-[100vh] flex flex-col bg-white">
 				<div className="relative flex-1 min-h-0">
 					<div
-						className="absolute inset-0 flex isolate gap-[var(--gap)] p-2 sm:p-[var(--gap)] pb-[calc(4rem+env(safe-area-inset-bottom))]"
+						className="absolute inset-0 flex isolate gap-[var(--gap)] p-2 sm:p-[var(--gap)] pb-[calc(5rem+env(safe-area-inset-bottom))]"
 						style={
 							{
 								'--gap': '1rem',
@@ -247,7 +276,9 @@ function JoinedRoom({
 					<Toast.Viewport className="absolute bottom-0 right-0" />
 				</div>
 				<div className="fixed bottom-0 left-0 right-0 flex pt-0 sm:pt-0 gap-1 sm:gap-4 text-sm p-2 sm:p-4 bg-white border-t border-gray-200 pb-[env(safe-area-inset-bottom)]">
-					{hasAiCredentials && aiInviteEnabled && <AiButton recordActivity={recordActivity} />}
+					{hasAiCredentials && aiInviteEnabled && (
+						<AiButton recordActivity={recordActivity} />
+					)}
 					<MicButton warnWhenSpeakingWhileMuted />
 					<CameraButton />
 					<ScreenshareButton />
@@ -264,32 +295,33 @@ function JoinedRoom({
 			</div>
 			<HighPacketLossWarningsToast />
 			<IceDisconnectedToast />
-			{isTranscriptionHost && transcriptionEnabled && transcriptionProvider === 'openai' && hasOpenAiTranscription && (
-                               <TranscriptionService
-                                       audioTracks={actualAudioTracks}
-                                       isActive={isTranscriptionHost}
-                                       participants={participantNames}
-                                       onTranscription={(t) =>
-                                               setTranscriptions((prev) => [...prev, t])
-                                       }
-                               />
-			)}
+			{isTranscriptionHost &&
+				transcriptionEnabled &&
+				transcriptionProvider === 'openai' &&
+				hasOpenAiTranscription && (
+					<TranscriptionService
+						audioTracks={actualAudioTracks}
+						isActive={isTranscriptionHost}
+						participants={participantNames}
+						onTranscription={(t) => setTranscriptions((prev) => [...prev, t])}
+					/>
+				)}
 			{transcriptionEnabled && (
 				<div className="fixed top-4 right-4 z-50 bg-white border border-gray-300 rounded-lg p-4 shadow-lg">
-					<button 
+					<button
 						onClick={() => setShowTranscription((v) => !v)}
 						className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
 					>
-						{showTranscription ? "Hide" : "Show"} Transcription
+						{showTranscription ? 'Hide' : 'Show'} Transcription
 					</button>
 					<div className="text-sm text-gray-600 mt-2">
-						Host: {isTranscriptionHost ? 'Yes' : 'No'} | 
-						Provider: {transcriptionProvider} | 
-						OpenAI: {hasOpenAiTranscription ? 'Yes' : 'No'}
+						Host: {isTranscriptionHost ? 'Yes' : 'No'} | Provider:{' '}
+						{transcriptionProvider} | OpenAI:{' '}
+						{hasOpenAiTranscription ? 'Yes' : 'No'}
 						<br />
-						Audio Tracks: {actualAudioTracks.length} | 
-						Mic: {userMedia.audioStreamTrack ? 'Yes' : 'No'} | 
-						Remote: {Object.keys(pulledAudioTracks).length}
+						Audio Tracks: {actualAudioTracks.length} | Mic:{' '}
+						{userMedia.audioStreamTrack ? 'Yes' : 'No'} | Remote:{' '}
+						{Object.keys(pulledAudioTracks).length}
 					</div>
 				</div>
 			)}

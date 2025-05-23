@@ -56,8 +56,9 @@ export function EnsurePermissions(props: EnsurePermissionsProps) {
 					<div className="max-w-lg mx-auto bg-white p-6 rounded-lg shadow">
 						<div className="mx-auto max-w-80">
 							<p className="mb-8">
-								In order to use WhenMeet.me Call, you will need to grant permission to
-								your camera and microphone. You will be prompted for access.
+								In order to use WhenMeet.me Call, you will need to grant
+								permission to your camera and microphone. You will be prompted
+								for access.
 							</p>
 							<Button
 								onClick={() => {
