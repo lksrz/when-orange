@@ -1,5 +1,5 @@
 import { useObservableAsValue, useValueAsObservable } from 'partytracks/react'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocalStorage } from 'react-use'
 import { combineLatest, map, of, shareReplay, switchMap, tap } from 'rxjs'
 import invariant from 'tiny-invariant'
@@ -45,6 +45,7 @@ export default function useUserMedia() {
 		useState<UserMediaError>()
 	const [audioUnavailableReason, setAudioUnavailableReason] =
 		useState<UserMediaError>()
+	const [networkChangeDetected, setNetworkChangeDetected] = useState(false)
 
 	const turnMicOff = useCallback(() => setAudioEnabled(false), [])
 	const turnMicOn = useCallback(() => setAudioEnabled(true), [])
@@ -53,14 +54,67 @@ export default function useUserMedia() {
 	const startScreenShare = useCallback(() => setScreenShareEnabled(true), [])
 	const endScreenShare = useCallback(() => setScreenShareEnabled(false), [])
 
+	// Network change detection
+	useEffect(() => {
+		const handleNetworkChange = () => {
+			console.log('🌐 Network change detected, will refresh media tracks')
+			setNetworkChangeDetected(true)
+			// Reset after a short delay to trigger track refresh
+			setTimeout(() => setNetworkChangeDetected(false), 100)
+		}
+
+		const handleIceConnectionRestored = () => {
+			console.log('🔄 ICE connection restored, refreshing media tracks')
+			setNetworkChangeDetected(true)
+			// Reset after a short delay to trigger track refresh
+			setTimeout(() => setNetworkChangeDetected(false), 100)
+		}
+
+		// Listen for network changes
+		window.addEventListener('online', handleNetworkChange)
+		window.addEventListener('offline', handleNetworkChange)
+		window.addEventListener(
+			'iceConnectionRestored',
+			handleIceConnectionRestored
+		)
+
+		// Listen for connection type changes (mobile networks)
+		if ('connection' in navigator) {
+			const connection = (navigator as any).connection
+			connection?.addEventListener('change', handleNetworkChange)
+		}
+
+		return () => {
+			window.removeEventListener('online', handleNetworkChange)
+			window.removeEventListener('offline', handleNetworkChange)
+			window.removeEventListener(
+				'iceConnectionRestored',
+				handleIceConnectionRestored
+			)
+			if ('connection' in navigator) {
+				const connection = (navigator as any).connection
+				connection?.removeEventListener('change', handleNetworkChange)
+			}
+		}
+	}, [])
+
 	const blurVideo$ = useValueAsObservable(blurVideo)
 	const videoEnabled$ = useValueAsObservable(videoEnabled)
+	const networkChange$ = useValueAsObservable(networkChangeDetected)
+
 	const videoTrack$ = useMemo(() => {
-		const track$ = videoEnabled$.pipe(
-			switchMap((enabled) =>
+		const track$ = combineLatest([videoEnabled$, networkChange$]).pipe(
+			switchMap(([enabled, networkChanged]) =>
 				enabled
 					? getUserMediaTrack$('videoinput').pipe(
 							tap({
+								next: (_track) => {
+									if (networkChanged) {
+										console.log('📹 Video track refreshed after network change')
+									}
+									// Clear any previous error when track is successfully obtained
+									setVideoUnavailableReason(undefined)
+								},
 								error: (e) => {
 									invariant(e instanceof Error)
 									const reason =
@@ -70,6 +124,7 @@ export default function useUserMedia() {
 									if (reason === 'UnknownError') {
 										console.error('Unknown error getting video track: ', e)
 									}
+									console.error('📹 Video track error:', reason, e)
 									setVideoUnavailableReason(reason)
 									setVideoEnabled(false)
 								},
@@ -89,29 +144,40 @@ export default function useUserMedia() {
 				bufferSize: 1,
 			})
 		)
-	}, [videoEnabled$, blurVideo$])
+	}, [videoEnabled$, blurVideo$, networkChange$])
 	const videoTrack = useObservableAsValue(videoTrack$)
 	const videoDeviceId = videoTrack?.getSettings().deviceId
 
 	const suppressNoiseEnabled$ = useValueAsObservable(suppressNoise)
 	const audioTrack$ = useMemo(() => {
 		return combineLatest([
-			getUserMediaTrack$('audioinput').pipe(
-				tap({
-					error: (e) => {
-						invariant(e instanceof Error)
-						const reason =
-							e.name in errorMessageMap
-								? (e.name as UserMediaError)
-								: 'UnknownError'
-						if (reason === 'UnknownError') {
-							console.error('Unknown error getting audio track: ', e)
-						}
-						setAudioUnavailableReason(reason)
-						setAudioEnabled(false)
-					},
-				})
-			),
+			combineLatest([
+				getUserMediaTrack$('audioinput').pipe(
+					tap({
+						next: (_track) => {
+							if (networkChangeDetected) {
+								console.log('🎤 Audio track refreshed after network change')
+							}
+							// Clear any previous error when track is successfully obtained
+							setAudioUnavailableReason(undefined)
+						},
+						error: (e) => {
+							invariant(e instanceof Error)
+							const reason =
+								e.name in errorMessageMap
+									? (e.name as UserMediaError)
+									: 'UnknownError'
+							if (reason === 'UnknownError') {
+								console.error('Unknown error getting audio track: ', e)
+							}
+							console.error('🎤 Audio track error:', reason, e)
+							setAudioUnavailableReason(reason)
+							setAudioEnabled(false)
+						},
+					})
+				),
+				networkChange$,
+			]).pipe(map(([track]) => track)),
 			suppressNoiseEnabled$,
 		]).pipe(
 			switchMap(([track, suppressNoise]) =>
@@ -122,7 +188,7 @@ export default function useUserMedia() {
 				bufferSize: 1,
 			})
 		)
-	}, [suppressNoiseEnabled$])
+	}, [suppressNoiseEnabled$, networkChangeDetected, networkChange$])
 
 	const alwaysOnAudioStreamTrack = useObservableAsValue(audioTrack$)
 	const audioDeviceId = alwaysOnAudioStreamTrack?.getSettings().deviceId

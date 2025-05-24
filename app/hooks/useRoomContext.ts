@@ -22,6 +22,18 @@ export type RoomContextType = {
 	userMedia: UserMedia
 	partyTracks: PartyTracks
 	iceConnectionState: RTCIceConnectionState
+	iceRestartInProgress: boolean
+	manualIceRestart: () => void
+	isSessionReady: () => boolean
+	executeWhenReady: (
+		operation: () => Promise<void>,
+		maxRetries?: number
+	) => Promise<boolean>
+	iceCandidateStats: {
+		local: { host: number; srflx: number; relay: number }
+		remote: { host: number; srflx: number; relay: number }
+	}
+	isMobileNetwork: boolean
 	room: ReturnType<typeof useRoom>
 	roomHistory: ReturnType<typeof useRoomHistory>
 	simulcastEnabled: boolean

@@ -15,6 +15,7 @@ export default function useRoom({
 		users: [],
 		ai: { enabled: false },
 	})
+	const [websocketConnected, setWebsocketConnected] = useState(false)
 
 	const userLeftFunctionRef = useRef(() => {})
 
@@ -25,6 +26,18 @@ export default function useRoom({
 	const websocket = usePartySocket({
 		party: 'rooms',
 		room: roomName,
+		onOpen: () => {
+			console.log('🌐 WebSocket connected')
+			setWebsocketConnected(true)
+		},
+		onClose: (e) => {
+			console.log('🌐 WebSocket disconnected:', e.code, e.reason)
+			setWebsocketConnected(false)
+		},
+		onError: (e) => {
+			console.error('🌐 WebSocket error:', e)
+			setWebsocketConnected(false)
+		},
 		onMessage: (e) => {
 			const message = JSON.parse(e.data) as ServerMessage
 			switch (message.type) {
@@ -89,5 +102,5 @@ export default function useRoom({
 		[roomState.users, websocket.id]
 	)
 
-	return { identity, otherUsers, websocket, roomState }
+	return { identity, otherUsers, websocket, roomState, websocketConnected }
 }

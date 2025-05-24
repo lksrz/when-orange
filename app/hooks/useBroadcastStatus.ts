@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect } from 'react'
 import { useUnmount } from 'react-use'
 import type { ClientMessage, User } from '~/types/Messages'
 
@@ -39,7 +39,8 @@ export default function useBroadcastStatus({
 
 	const id = identity?.id
 	const name = identity?.name
-	useEffect(() => {
+
+	const sendUserUpdate = useCallback(() => {
 		if (id && name) {
 			const user: User = {
 				id,
@@ -59,15 +60,32 @@ export default function useBroadcastStatus({
 				},
 			}
 
-			function sendUserUpdate() {
-				websocket.send(
-					JSON.stringify({
-						type: 'userUpdate',
-						user,
-					} satisfies ClientMessage)
-				)
-			}
+			console.log('📡 Broadcasting user status:', user)
+			websocket.send(
+				JSON.stringify({
+					type: 'userUpdate',
+					user,
+				} satisfies ClientMessage)
+			)
+		}
+	}, [
+		id,
+		name,
+		raisedHand,
+		speaking,
+		sessionId,
+		audioEnabled,
+		audioUnavailable,
+		videoEnabled,
+		screenShareEnabled,
+		video,
+		audio,
+		screenshare,
+		websocket,
+	])
 
+	useEffect(() => {
+		if (id && name) {
 			// let's send our userUpdate right away
 			sendUserUpdate()
 
@@ -76,22 +94,27 @@ export default function useBroadcastStatus({
 
 			return () => websocket.removeEventListener('open', sendUserUpdate)
 		}
-	}, [
-		id,
-		name,
-		websocket,
-		sessionId,
-		audio,
-		video,
-		screenshare,
-		audioEnabled,
-		videoEnabled,
-		screenShareEnabled,
-		raisedHand,
-		speaking,
-		audioUnavailableReason,
-		audioUnavailable,
-	])
+	}, [id, name, websocket, sendUserUpdate])
+
+	// Listen for ICE connection restoration and re-broadcast status
+	useEffect(() => {
+		const handleIceConnectionRestored = () => {
+			console.log('🔄 ICE connection restored, re-broadcasting user status')
+			// Wait a moment for tracks to be fully established
+			setTimeout(sendUserUpdate, 1000)
+		}
+
+		window.addEventListener(
+			'iceConnectionRestored',
+			handleIceConnectionRestored
+		)
+		return () => {
+			window.removeEventListener(
+				'iceConnectionRestored',
+				handleIceConnectionRestored
+			)
+		}
+	}, [sendUserUpdate])
 
 	useUnmount(() => {
 		if (id && name) {

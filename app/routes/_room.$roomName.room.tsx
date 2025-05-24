@@ -11,6 +11,7 @@ import { useMount, useWindowSize } from 'react-use'
 import invariant from 'tiny-invariant'
 import { AiButton } from '~/components/AiButton'
 import { CameraButton } from '~/components/CameraButton'
+import { ConnectionDiagnostics } from '~/components/ConnectionDiagnostics'
 import { CopyButton } from '~/components/CopyButton'
 import { HighPacketLossWarningsToast } from '~/components/HighPacketLossWarningsToast'
 import { IceDisconnectedToast } from '~/components/IceDisconnectedToast'
@@ -146,7 +147,9 @@ function JoinedRoom({
 	// Initialize E2EE after peer connection is established
 	useEffect(() => {
 		if (e2eeEnabled && identity) {
-			const isFirstUser = otherUsers.length === 0
+			// Use a more reliable method to determine if this is the first user
+			// We'll start as a joining user and let the E2EE system handle group creation if needed
+			const isFirstUser = false // Always start as joining user, E2EE will create group if none exists
 			console.log(
 				'🔐 Calling e2eeOnJoin with firstUser:',
 				isFirstUser,
@@ -299,6 +302,7 @@ function JoinedRoom({
 			</div>
 			<HighPacketLossWarningsToast />
 			<IceDisconnectedToast />
+			<ConnectionDiagnostics />
 			{isTranscriptionHost &&
 				transcriptionEnabled &&
 				transcriptionProvider === 'openai' &&

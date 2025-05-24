@@ -2,7 +2,7 @@ import type { LoaderFunctionArgs } from '@remix-run/cloudflare'
 import { json } from '@remix-run/cloudflare'
 import { Outlet, useLoaderData, useParams } from '@remix-run/react'
 import { useObservableAsValue, useValueAsObservable } from 'partytracks/react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { from, of, switchMap } from 'rxjs'
 import invariant from 'tiny-invariant'
 import { EnsureOnline } from '~/components/EnsureOnline'
@@ -129,6 +129,7 @@ interface RoomProps {
 function Room({ room, userMedia }: RoomProps) {
 	const [joined, setJoined] = useState(false)
 	const [dataSaverMode, setDataSaverMode] = useState(false)
+	const [encodingParamsStable, setEncodingParamsStable] = useState(true)
 	const { roomName } = useParams()
 	invariant(roomName)
 
@@ -151,12 +152,111 @@ function Room({ room, userMedia }: RoomProps) {
 	invariant(room.roomState.meetingId, 'Meeting ID cannot be missing')
 	params.set('correlationId', room.roomState.meetingId)
 
-	const { partyTracks, iceConnectionState } = usePeerConnection({
+	const {
+		partyTracks,
+		iceConnectionState,
+		iceRestartInProgress,
+		manualIceRestart,
+		isSessionReady,
+		executeWhenReady,
+		iceCandidateStats,
+		isMobileNetwork,
+	} = usePeerConnection({
 		maxApiHistory,
 		apiExtraParams: params.toString(),
 		iceServers,
 	})
+
+	// Log ICE servers for debugging
+	useEffect(() => {
+		if (iceServers) {
+			const turnServers = iceServers.filter((server) => {
+				const urls = Array.isArray(server.urls) ? server.urls : [server.urls]
+				return urls.some((url) => url.includes('turn:'))
+			})
+
+			console.log(
+				'🧊 ICE Servers configured:',
+				iceServers.map((server) => ({
+					urls: Array.isArray(server.urls) ? server.urls : [server.urls],
+					hasCredentials: !!(server.username && server.credential),
+					type: Array.isArray(server.urls)
+						? server.urls.some((url) => url.includes('turn:'))
+							? 'TURN'
+							: 'STUN'
+						: server.urls.includes('turn:')
+							? 'TURN'
+							: 'STUN',
+				}))
+			)
+			console.log('📱 Mobile network detected:', isMobileNetwork)
+
+			if (turnServers.length > 0) {
+				console.log('✅ TURN servers available for mobile network fallback')
+			} else {
+				console.warn(
+					'⚠️ No TURN servers configured - mobile connections may fail'
+				)
+			}
+		}
+	}, [iceServers, isMobileNetwork])
+
 	const roomHistory = useRoomHistory(partyTracks, room)
+
+	// Handle encoding parameter stability during ICE transitions
+	useEffect(() => {
+		if (iceRestartInProgress) {
+			console.log('🔧 Disabling encoding parameter updates during ICE restart')
+			setEncodingParamsStable(false)
+		}
+	}, [iceRestartInProgress])
+
+	// Listen for ICE connection restoration to re-enable encoding parameters
+	useEffect(() => {
+		const handleIceConnectionRestored = () => {
+			console.log('🔧 Re-enabling encoding parameter updates after ICE restart')
+			// Wait a bit longer to ensure transceivers are fully stable
+			setTimeout(() => {
+				setEncodingParamsStable(true)
+			}, 1000)
+		}
+
+		window.addEventListener(
+			'iceConnectionRestored',
+			handleIceConnectionRestored
+		)
+		return () => {
+			window.removeEventListener(
+				'iceConnectionRestored',
+				handleIceConnectionRestored
+			)
+		}
+	}, [])
+
+	// Additional safety: disable encoding params during any connection instability
+	useEffect(() => {
+		if (
+			iceConnectionState === 'disconnected' ||
+			iceConnectionState === 'failed'
+		) {
+			console.log(
+				'🔧 Disabling encoding parameters due to connection instability:',
+				iceConnectionState
+			)
+			setEncodingParamsStable(false)
+		} else if (
+			iceConnectionState === 'connected' ||
+			iceConnectionState === 'completed'
+		) {
+			// Only re-enable if we're not in the middle of an ICE restart
+			if (!iceRestartInProgress) {
+				console.log('🔧 Connection stable, re-enabling encoding parameters')
+				setTimeout(() => {
+					setEncodingParamsStable(true)
+				}, 500)
+			}
+		}
+	}, [iceConnectionState, iceRestartInProgress])
 
 	const scaleResolutionDownBy = useMemo(() => {
 		const videoStreamTrack = userMedia.videoStreamTrack
@@ -173,8 +273,32 @@ function Room({ room, userMedia }: RoomProps) {
 			scaleResolutionDownBy,
 		},
 	])
-	const videoTrackEncodingParams$ =
-		useValueAsObservable<RTCRtpEncodingParameters[]>(videoEncodingParams)
+
+	// Only update encoding parameters when the connection is stable
+	const stableVideoEncodingParams = useMemo(() => {
+		if (!encodingParamsStable) {
+			// Return basic parameters during unstable periods
+			console.log('🔧 Using basic encoding parameters during unstable period')
+			return [
+				{
+					maxFramerate: maxWebcamFramerate,
+					maxBitrate: maxWebcamBitrate,
+					// Don't include scaleResolutionDownBy during unstable periods
+				},
+			]
+		}
+		console.log('🔧 Using full encoding parameters:', videoEncodingParams)
+		return videoEncodingParams
+	}, [
+		videoEncodingParams,
+		encodingParamsStable,
+		maxWebcamFramerate,
+		maxWebcamBitrate,
+	])
+
+	const videoTrackEncodingParams$ = useValueAsObservable<
+		RTCRtpEncodingParameters[]
+	>(stableVideoEncodingParams)
 	const pushedVideoTrack$ = useMemo(
 		() =>
 			partyTracks.push(userMedia.videoTrack$, {
@@ -236,6 +360,8 @@ function Room({ room, userMedia }: RoomProps) {
 		partyTracks: partyTracks,
 		roomHistory,
 		iceConnectionState,
+		iceRestartInProgress,
+		manualIceRestart,
 		room,
 		simulcastEnabled,
 		e2eeEnabled,
@@ -246,6 +372,10 @@ function Room({ room, userMedia }: RoomProps) {
 			audio: trackObjectToString(pushedAudioTrack),
 			screenshare: trackObjectToString(pushedScreenSharingTrack),
 		},
+		isSessionReady,
+		executeWhenReady,
+		iceCandidateStats,
+		isMobileNetwork,
 	}
 
 	return <Outlet context={context} />
