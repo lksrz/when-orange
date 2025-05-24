@@ -170,11 +170,6 @@ function Room({ room, userMedia }: RoomProps) {
 	// Log ICE servers for debugging
 	useEffect(() => {
 		if (iceServers) {
-			const turnServers = iceServers.filter((server) => {
-				const urls = Array.isArray(server.urls) ? server.urls : [server.urls]
-				return urls.some((url) => url.includes('turn:'))
-			})
-
 			console.log(
 				'🧊 ICE Servers configured:',
 				iceServers.map((server) => ({
@@ -191,12 +186,18 @@ function Room({ room, userMedia }: RoomProps) {
 			)
 			console.log('📱 Mobile network detected:', isMobileNetwork)
 
-			if (turnServers.length > 0) {
-				console.log('✅ TURN servers available for mobile network fallback')
-			} else {
+			// Check if we have TURN servers
+			const hasTurnServers = iceServers.some((server) => {
+				const urls = Array.isArray(server.urls) ? server.urls : [server.urls]
+				return urls.some((url) => url.includes('turn:'))
+			})
+
+			if (!hasTurnServers) {
 				console.warn(
 					'⚠️ No TURN servers configured - mobile connections may fail'
 				)
+			} else {
+				console.log('✅ TURN servers available for mobile network fallback')
 			}
 		}
 	}, [iceServers, isMobileNetwork])

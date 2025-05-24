@@ -1,37 +1,8 @@
 # Cross-Network Video Connection Issue Analysis
 
-## ✅ ISSUE RESOLVED (2025-01-24)
+## Problem Summary
 
-### Final Status: SUCCESS
-
-The cross-network video connection issue has been **successfully resolved**. The problem was with the Cloudflare TURN service configuration.
-
-### Evidence of Resolution:
-
-- **TURN relay candidates working**: `relay: 6` candidates generated
-- **Cross-network connection successful**: `ICE connection state: checking → connected`
-- **Video streams working**: E2EE encryption/decryption transforms active
-- **Mobile network detection working**: Properly detects cellular vs WiFi
-
-### What Was Fixed:
-
-1. **Cloudflare TURN Service**: `TURN_SERVICE_TOKEN` was missing/invalid and has been corrected
-2. **ICE Candidate Generation**: Now generating both STUN and TURN candidates properly
-3. **NAT Traversal**: TURN relay enables connection through mobile network NATs
-4. **Logging Cleanup**: Reduced verbose logging while maintaining essential diagnostics
-
-### Current Behavior:
-
-- **WiFi ↔ WiFi**: Works via direct connection (STUN)
-- **WiFi ↔ 5G**: Works via TURN relay
-- **5G ↔ 5G**: Works via TURN relay
-- **Corporate networks**: Should work via TURN relay
-
----
-
-## Original Problem Summary
-
-When meeting participants are on different networks (e.g., one on WiFi and another on 5G/mobile data), video feeds appeared blank between them, even though WebSocket events (like raise hand) continued to work. This issue did not occur when both users were on the same WiFi network.
+When meeting participants are on different networks (e.g., one on WiFi and another on 5G/mobile data), video feeds appear blank between them, even though WebSocket events (like raise hand) continue to work. This issue does not occur when both users are on the same WiFi network.
 
 ## Key Observations from Logs
 

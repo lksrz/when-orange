@@ -1,9 +1,5 @@
 // Test script for Cloudflare TURN service
 // Run with: node test-turn-service.js
-//
-// ✅ NOTE: This was used to debug the cross-network video issue.
-// The issue has been resolved - TURN service is now working correctly.
-// This script can be used for future TURN service diagnostics.
 
 const TURN_SERVICE_ID =
 	process.env.TURN_SERVICE_ID || '3d47c5a790a0b730d98bf6ebf0e37553'

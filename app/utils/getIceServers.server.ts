@@ -4,6 +4,13 @@ export async function getIceServers({
 	TURN_SERVICE_ID,
 	TURN_SERVICE_TOKEN,
 }: Env): Promise<undefined | RTCIceServer[]> {
+	console.log('🔧 TURN Service Configuration:', {
+		hasId: !!TURN_SERVICE_ID,
+		hasToken: !!TURN_SERVICE_TOKEN,
+		idLength: TURN_SERVICE_ID?.length || 0,
+		tokenLength: TURN_SERVICE_TOKEN?.length || 0,
+	})
+
 	// Debug mode: use public TURN servers for testing
 	// This can be enabled by setting TURN_SERVICE_ID to "debug"
 	if (TURN_SERVICE_ID === 'debug') {
@@ -30,11 +37,18 @@ export async function getIceServers({
 
 	if (TURN_SERVICE_TOKEN === undefined || TURN_SERVICE_ID === undefined) {
 		console.warn('⚠️ TURN service not configured - missing ID or TOKEN')
+		console.warn('  TURN_SERVICE_ID:', TURN_SERVICE_ID ? 'present' : 'missing')
+		console.warn(
+			'  TURN_SERVICE_TOKEN:',
+			TURN_SERVICE_TOKEN ? 'present' : 'missing'
+		)
 		return
 	}
 
 	try {
+		console.log('🔧 Fetching TURN credentials from Cloudflare...')
 		const url = `https://rtc.live.cloudflare.com/v1/turn/keys/${TURN_SERVICE_ID}/credentials/generate-ice-servers`
+		console.log('🔧 TURN API URL:', url)
 
 		const response = await fetch(url, {
 			method: 'POST',
@@ -43,6 +57,12 @@ export async function getIceServers({
 				Authorization: `Bearer ${TURN_SERVICE_TOKEN}`,
 				'Content-Type': 'application/json',
 			},
+		})
+
+		console.log('🔧 TURN API Response:', {
+			status: response.status,
+			statusText: response.statusText,
+			headers: Object.fromEntries(response.headers.entries()),
 		})
 
 		if (!response.ok) {
@@ -56,6 +76,16 @@ export async function getIceServers({
 		}
 
 		const data = (await response.json()) as { iceServers: RTCIceServer[] }
+		console.log('✅ TURN credentials received:', {
+			serverCount: data.iceServers?.length || 0,
+			servers: data.iceServers?.map((server) => ({
+				urls: Array.isArray(server.urls) ? server.urls : [server.urls],
+				hasCredentials: !!(server.username && server.credential),
+				urlTypes: Array.isArray(server.urls)
+					? server.urls.map((url) => url.split(':')[0])
+					: [server.urls.split(':')[0]],
+			})),
+		})
 
 		// Validate that we have TURN servers
 		const hasTurnServers = data.iceServers?.some((server) => {
@@ -66,12 +96,19 @@ export async function getIceServers({
 		if (!hasTurnServers) {
 			console.warn('⚠️ No TURN servers found in response, only STUN servers')
 		} else {
-			console.log('✅ TURN servers configured successfully')
+			console.log('✅ TURN servers found in response')
 		}
 
 		return data.iceServers
 	} catch (error) {
 		console.error('❌ Error fetching TURN credentials:', error)
+		if (error instanceof Error) {
+			console.error('❌ Error details:', {
+				name: error.name,
+				message: error.message,
+				stack: error.stack,
+			})
+		}
 
 		// Provide fallback STUN servers if TURN service fails
 		console.log('🔄 Using fallback STUN servers due to TURN service failure')

@@ -43,11 +43,7 @@ const isMobileNetwork = () => {
 		return false
 	}
 
-	// Only log this once per session to avoid spam
-	if (!(window as any)._networkApiLoggedOnce) {
-		console.log('❓ Network Connection API not available')
-		;(window as any)._networkApiLoggedOnce = true
-	}
+	console.log('❓ Network Connection API not available')
 	// Fallback: don't assume mobile if we can't detect
 	return false
 }
@@ -431,12 +427,10 @@ export const usePeerConnection = (config: PartyTracksConfig) => {
 		window.addEventListener('online', handleNetworkChange)
 		window.addEventListener('offline', handleNetworkChange)
 
-		// Listen for connection type changes (mobile networks) - but only if available
+		// Listen for connection type changes (mobile networks)
 		if ('connection' in navigator) {
 			const connection = (navigator as any).connection
-			if (connection && typeof connection.addEventListener === 'function') {
-				connection.addEventListener('change', handleNetworkChange)
-			}
+			connection?.addEventListener('change', handleNetworkChange)
 		}
 
 		return () => {
@@ -444,12 +438,7 @@ export const usePeerConnection = (config: PartyTracksConfig) => {
 			window.removeEventListener('offline', handleNetworkChange)
 			if ('connection' in navigator) {
 				const connection = (navigator as any).connection
-				if (
-					connection &&
-					typeof connection.removeEventListener === 'function'
-				) {
-					connection.removeEventListener('change', handleNetworkChange)
-				}
+				connection?.removeEventListener('change', handleNetworkChange)
 			}
 		}
 	}, [peerConnection, iceRestartInProgress])
