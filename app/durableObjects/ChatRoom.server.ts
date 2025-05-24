@@ -78,6 +78,9 @@ export class ChatRoom extends Server<Env> {
 		const username = await getUsername(ctx.request)
 		assertNonNullable(username)
 
+		// Check for duplicate users (same username) and clean them up
+		await this.cleanupDuplicateUser(username, connection.id)
+
 		let user = await this.ctx.storage.get<User>(`session-${connection.id}`)
 		const foundInStorage = user !== undefined
 		if (!foundInStorage) {
@@ -387,6 +390,7 @@ export class ChatRoom extends Server<Env> {
 					await this.ctx.storage.put(`heartbeat-${connection.id}`, Date.now())
 					break
 				}
+
 				case 'disableAi': {
 					await this.ctx.storage
 						.list({
@@ -609,6 +613,59 @@ export class ChatRoom extends Server<Env> {
 			type: 'userLeftNotification',
 			id,
 		})
+	}
+
+	async cleanupDuplicateUser(username: string, newConnectionId: string) {
+		const meetingId = await this.getMeetingId()
+		const users = await this.getUsers()
+
+		// Find any existing users with the same username
+		const duplicateUsers = []
+		for (const [key, user] of users) {
+			const existingConnectionId = key.replace('session-', '')
+			// If same username but different connection ID, it's a duplicate
+			if (user.name === username && existingConnectionId !== newConnectionId) {
+				duplicateUsers.push({ connectionId: existingConnectionId, user })
+			}
+		}
+
+		// Clean up duplicate users
+		for (const { connectionId, user } of duplicateUsers) {
+			log({
+				eventName: 'cleanupDuplicateUser',
+				meetingId,
+				username,
+				oldConnectionId: connectionId,
+				newConnectionId,
+			})
+
+			// Send user left notification for old session
+			this.userLeftNotification(connectionId)
+
+			// Close the old connection if it still exists
+			const connections = [...this.getConnections()]
+			const oldConnection = connections.find((c) => c.id === connectionId)
+			if (oldConnection) {
+				oldConnection.close(1011, 'Duplicate user session detected')
+			}
+
+			// Clean up storage for old session
+			await this.ctx.storage.delete(`session-${connectionId}`).catch(() => {
+				console.warn(
+					`Failed to delete duplicate session session-${connectionId}`
+				)
+			})
+			await this.ctx.storage.delete(`heartbeat-${connectionId}`).catch(() => {
+				console.warn(
+					`Failed to delete duplicate heartbeat heartbeat-${connectionId}`
+				)
+			})
+		}
+
+		// If we cleaned up any duplicates, broadcast the updated room state
+		if (duplicateUsers.length > 0) {
+			await this.broadcastRoomState()
+		}
 	}
 
 	async cleanupOldConnections() {

@@ -5,8 +5,9 @@ test('Two users joining the same room', async ({ browser }) => {
 	// can't use nanoid here :(
 	const location = `http://localhost:8787/${randomUUID()}`
 
-	const context = await browser.newContext()
-	const page = await context.newPage()
+	// First user - separate context
+	const contextOne = await browser.newContext()
+	const page = await contextOne.newPage()
 
 	await page.goto(location)
 	await page.getByLabel('Enter your display name').fill('kevin')
@@ -25,8 +26,13 @@ test('Two users joining the same room', async ({ browser }) => {
 		timeout: 10000,
 	})
 
-	const pageTwo = await context.newPage()
+	// Second user - separate context to avoid session sharing
+	const contextTwo = await browser.newContext()
+	const pageTwo = await contextTwo.newPage()
+
 	await pageTwo.goto(location)
+	await pageTwo.getByLabel('Enter your display name').fill('sarah')
+	await pageTwo.getByLabel('Enter your display name').press('Enter')
 
 	// Wait for session on second page too
 	await expect(pageTwo.getByRole('button', { name: 'Join' })).toBeVisible({

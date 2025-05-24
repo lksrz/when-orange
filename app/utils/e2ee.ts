@@ -1,5 +1,5 @@
 import type { PartyTracks } from 'partytracks/client'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import invariant from 'tiny-invariant'
 import type useRoom from '~/hooks/useRoom'
 import type { ServerMessage } from '~/types/Messages'
@@ -103,6 +103,8 @@ export class EncryptionWorker {
 	_worker: Worker | null = null
 	safetyNumber: number = -1
 	id: string
+	private configuredSenders: Set<string> = new Set()
+	private configuredReceivers: Set<string> = new Set()
 
 	constructor(config: { id: string }) {
 		this.id = config.id
@@ -110,7 +112,7 @@ export class EncryptionWorker {
 	}
 
 	dispose() {
-		this.worker.terminate()
+		this.cleanup()
 	}
 
 	initialize() {
@@ -149,19 +151,29 @@ export class EncryptionWorker {
 	}
 
 	async setupSenderTransform(sender: RTCRtpSender) {
-		const trackKind = sender.track?.kind
 		const trackId = sender.track?.id
+		if (!trackId || this.configuredSenders.has(trackId)) {
+			console.log(
+				'🔐 Sender transform already configured or no track ID for:',
+				trackId
+			)
+			return
+		}
 
-		console.log('🔐 Setting up sender transform')
+		console.log('🔐 Setting up sender transform for track:', trackId)
 
 		try {
 			// If this is Firefox, we will have to use RTCRtpScriptTransform
 			if (window.RTCRtpScriptTransform) {
 				sender.transform = new RTCRtpScriptTransform(this.worker, {
-					operation: 'encryptStream',
+					type: 'encryptStream',
 				})
 
-				console.log('🔐 Successfully set up sender transform')
+				console.log(
+					'🔐 Successfully set up sender transform for track:',
+					trackId
+				)
+				this.configuredSenders.add(trackId)
 				return
 			}
 
@@ -181,7 +193,11 @@ export class EncryptionWorker {
 					[readable, writable]
 				)
 
-				console.log('🔐 Successfully set up sender transform')
+				console.log(
+					'🔐 Successfully set up sender transform for track:',
+					trackId
+				)
+				this.configuredSenders.add(trackId)
 				return
 			}
 
@@ -195,16 +211,28 @@ export class EncryptionWorker {
 	}
 
 	async setupReceiverTransform(receiver: RTCRtpReceiver) {
-		console.log('🔐 Setting up receiver transform')
+		const trackId = receiver.track?.id
+		if (!trackId || this.configuredReceivers.has(trackId)) {
+			console.log(
+				'🔐 Receiver transform already configured or no track ID for:',
+				trackId
+			)
+			return
+		}
+		console.log('🔐 Setting up receiver transform for track:', trackId)
 
 		try {
 			// If this is Firefox, we will have to use RTCRtpScriptTransform
 			if (window.RTCRtpScriptTransform) {
 				receiver.transform = new RTCRtpScriptTransform(this.worker, {
-					operation: 'decryptStream',
+					type: 'decryptStream',
 				})
 
-				console.log('🔐 Successfully set up receiver transform')
+				console.log(
+					'🔐 Successfully set up receiver transform for track:',
+					trackId
+				)
+				this.configuredReceivers.add(trackId)
 				return
 			}
 
@@ -224,7 +252,11 @@ export class EncryptionWorker {
 					[readable, writable]
 				)
 
-				console.log('🔐 Successfully set up receiver transform')
+				console.log(
+					'🔐 Successfully set up receiver transform for track:',
+					trackId
+				)
+				this.configuredReceivers.add(trackId)
 				return
 			}
 
@@ -272,6 +304,15 @@ export class EncryptionWorker {
 		}
 	}
 
+	cleanup() {
+		if (this._worker) {
+			this._worker.terminate()
+			this._worker = null
+		}
+		this.configuredSenders.clear()
+		this.configuredReceivers.clear()
+	}
+
 	onNewSafetyNumber(handler: (safetyNumber: Uint8Array) => void) {
 		this.worker.addEventListener('message', (event) => {
 			if (event.data.type === 'newSafetyNumber') {
@@ -317,45 +358,56 @@ export function useE2EE({
 	room: ReturnType<typeof useRoom>
 }) {
 	const [safetyNumber, setSafetyNumber] = useState<string>()
-	// Track removed users to prevent duplicate removal events
-	const removedUsersRef = useRef<Set<string>>(new Set())
 
-	const encryptionWorker = useMemo(
-		() =>
-			new EncryptionWorker({
-				id: room.websocket.id,
-			}),
-		[room.websocket.id]
-	)
+	const encryptionWorker = useMemo(() => {
+		if (!enabled) {
+			console.log('🔐 E2EE disabled, not creating worker')
+			return null
+		}
+
+		console.log('🔐 Creating encryption worker for user:', room.websocket.id)
+		const worker = new EncryptionWorker({
+			id: room.websocket.id,
+		})
+
+		return worker
+	}, [enabled, room.websocket.id])
 
 	const [joined, setJoined] = useState(false)
 	const [firstUser, setFirstUser] = useState(false)
 
 	useEffect(() => {
 		return () => {
-			encryptionWorker.dispose()
+			encryptionWorker?.dispose()
 		}
 	}, [encryptionWorker])
 
 	useEffect(() => {
-		if (!enabled) return
+		if (!enabled || !encryptionWorker) return
 
 		const subscription = partyTracks.transceiver$.subscribe((transceiver) => {
 			if (transceiver.direction === 'sendonly') {
 				try {
+					// Only set VP9 codec preferences if explicitly supported and safe to do so
 					if (transceiver.sender.track?.kind === 'video') {
 						const capability = RTCRtpSender.getCapabilities('video')
-						const codecs = capability ? capability.codecs : []
-						const vp9codec = codecs.filter(
-							(a) => a.mimeType === 'video/VP9' || a.mimeType === 'video/rtx'
-						)
-						if (vp9codec.length > 0) {
-							transceiver.setCodecPreferences(vp9codec)
+						if (capability) {
+							const vp9codec = capability.codecs.filter(
+								(a) => a.mimeType === 'video/VP9' || a.mimeType === 'video/rtx'
+							)
+							// Only set codec preferences if VP9 is available and transceiver is in proper state
+							if (
+								vp9codec.length > 0 &&
+								transceiver.currentDirection === null
+							) {
+								transceiver.setCodecPreferences(vp9codec)
+							}
 						}
 					}
 					encryptionWorker.setupSenderTransform(transceiver.sender)
 				} catch (error) {
 					console.error('🔐 Failed to configure sender transceiver:', error)
+					// Continue with encryption setup even if codec preferences fail
 				}
 			}
 		})
@@ -366,7 +418,7 @@ export function useE2EE({
 	}, [enabled, encryptionWorker, partyTracks.transceiver$])
 
 	useEffect(() => {
-		if (!enabled) return
+		if (!enabled || !encryptionWorker) return
 
 		const subscription = partyTracks.transceiver$.subscribe((transceiver) => {
 			if (transceiver.direction === 'recvonly') {
@@ -393,7 +445,15 @@ export function useE2EE({
 	)
 
 	useEffect(() => {
-		if (!joined) return
+		if (!joined || !encryptionWorker) {
+			console.log('🔐 E2EE effect skipped:', {
+				joined,
+				encryptionWorker: !!encryptionWorker,
+			})
+			return
+		}
+
+		console.log('🔐 Setting up E2EE handlers, firstUser:', firstUser)
 
 		encryptionWorker.onNewSafetyNumber((buffer) => {
 			const safetyNum = arrayBufferToDecimal(buffer)
@@ -415,32 +475,26 @@ export function useE2EE({
 			const message = JSON.parse(event.data) as ServerMessage
 			if (message.type === 'e2eeMlsMessage') {
 				console.log('📨 incoming e2eeMlsMessage from peer', message)
-				encryptionWorker.handleIncomingEvent(message.payload)
+				encryptionWorker!.handleIncomingEvent(message.payload)
 			}
 			if (message.type === 'userLeftNotification') {
-				// Deduplicate user removal events
-				if (!removedUsersRef.current.has(message.id)) {
-					console.log('👋 Processing user left:', message.id)
-					removedUsersRef.current.add(message.id)
-					encryptionWorker.userLeft(message.id)
-				} else {
-					console.log('👋 Ignoring duplicate user left:', message.id)
-				}
+				console.log('👋 Processing user left:', message.id)
+				encryptionWorker!.userLeft(message.id)
 			}
 		}
 
 		room.websocket.addEventListener('message', handler)
 
 		if (firstUser) {
+			console.log('🔐 Initializing as first user (creating group)')
 			encryptionWorker.initializeAndCreateGroup()
 		} else {
+			console.log('🔐 Initializing as joining user')
 			encryptionWorker.initialize()
 		}
 
 		return () => {
 			room.websocket.removeEventListener('message', handler)
-			// Clear removed users tracking when cleaning up
-			removedUsersRef.current.clear()
 		}
 	}, [encryptionWorker, firstUser, joined, room.websocket])
 

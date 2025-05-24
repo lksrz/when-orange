@@ -24,9 +24,9 @@ const CIPHERSUITE: Ciphersuite = Ciphersuite::MLS_128_DHKEMX25519_AES128GCM_SHA2
 const PROT_VERSION: ProtocolVersion = ProtocolVersion::Mls10;
 // Permit decryption of messages that are up to 500 messages old (for that sender)
 const OUT_OF_ORDER_TOLERANCE: u32 = 500;
-// Permit decryption of messages from up to 1000 messages in the future (for that sender). 1000 is
-// the default.
-const MAX_MESSAGE_SEQ_JUMP: u32 = 1000;
+// Permit decryption of messages from up to 10,000 messages in the future (for that sender)
+// Modest increase to handle real-time media better without breaking Safari
+const MAX_MESSAGE_SEQ_JUMP: u32 = 10_000;
 
 type SafetyNumber = [u8; 32];
 
@@ -410,15 +410,6 @@ impl WorkerState {
 
         let processed_message = match group.process_message(&self.mls_provider, prot_msg) {
             Ok(m) => m.into_content(),
-
-            // If the message is from the wrong epoch, ignore it. Things can't really get out of
-            // order when we have a designated committer and a strongly serializing message delivery
-            // service.
-            Err(ProcessMessageError::ValidationError(
-                openmls::group::ValidationError::WrongEpoch,
-            )) => {
-                return WorkerResponse::default();
-            }
             Err(e) => {
                 info!("Could not process message: {e}");
                 return WorkerResponse::default();
@@ -477,9 +468,11 @@ impl WorkerState {
                         self.my_signing_keys.as_ref().unwrap(),
                         msg,
                     )
-                    .unwrap()
-                    .to_bytes()
-                    .unwrap()
+                    .and_then(|message| message.to_bytes())
+                    .unwrap_or_else(|e| {
+                        info!("Failed to encrypt message: {e}");
+                        vec![0u8; msg.len()]
+                    })
             })
             .unwrap_or_else(|| vec![0u8; msg.len()])
     }
@@ -520,6 +513,8 @@ impl WorkerState {
             Vec::new()
         })
     }
+
+
 }
 
 // Now define the top-level functions that touch global state. These are thin wrappers
@@ -686,6 +681,8 @@ pub fn handle_commit(serialized_commit: &[u8], sender_uid: &str) -> WorkerRespon
         })
         .expect("couldn't acquire thread-local storage")
 }
+
+
 
 #[cfg(test)]
 mod tests {

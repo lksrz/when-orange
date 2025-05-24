@@ -34,9 +34,22 @@ onmessage = async (event /* MessageEvent */) => {
 // This just repackages the event and sends it to onmessage.
 self.onrtctransform = async (event /* RTCTransformEvent */) => {
 	const transformer = event.transformer
+
+	// Validate that we have the expected options
+	if (!transformer.options || typeof transformer.options.type !== 'string') {
+		console.error(
+			'RTCRtpScriptTransform: Invalid options, expected type to be a string',
+			transformer.options
+		)
+		return
+	}
+
+	// Log for debugging
+	console.log('🔐 RTCRtpScriptTransform processing:', transformer.options.type)
+
 	const repackagedEvent = {
 		data: {
-			type: transformer.options.operation,
+			type: transformer.options.type,
 			in: transformer.readable,
 			out: transformer.writable,
 		},

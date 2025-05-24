@@ -136,6 +136,8 @@ pub async fn processEvent(event: Object) -> JsValue {
             Some(mls_ops::handle_commit(&msg_bytes, &sender))
         }
 
+
+
         _ => panic!("unknown message type {ty} from main thread"),
     };
 

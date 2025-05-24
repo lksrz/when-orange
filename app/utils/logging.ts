@@ -79,6 +79,19 @@ export type LogEvent =
 			connectionId: string
 			sessionId?: string
 	  }
+	| {
+			eventName: 'e2eeSessionCleanup'
+			meetingId?: string
+			connectionId: string
+			targetUserId: string
+	  }
+	| {
+			eventName: 'cleanupDuplicateUser'
+			meetingId?: string
+			username: string
+			oldConnectionId: string
+			newConnectionId: string
+	  }
 
 export function log(event: LogEvent) {
 	console.log(event)
