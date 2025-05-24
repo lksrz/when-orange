@@ -1,5 +1,5 @@
 import type { PartyTracks } from 'partytracks/client'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import invariant from 'tiny-invariant'
 import type useRoom from '~/hooks/useRoom'
 import type { ServerMessage } from '~/types/Messages'
@@ -154,77 +154,87 @@ export class EncryptionWorker {
 
 		console.log('🔐 Setting up sender transform')
 
-		// If this is Firefox, we will have to use RTCRtpScriptTransform
-		if (window.RTCRtpScriptTransform) {
-			sender.transform = new RTCRtpScriptTransform(this.worker, {
-				operation: 'encryptStream',
-			})
+		try {
+			// If this is Firefox, we will have to use RTCRtpScriptTransform
+			if (window.RTCRtpScriptTransform) {
+				sender.transform = new RTCRtpScriptTransform(this.worker, {
+					operation: 'encryptStream',
+				})
 
-			console.log('🔐 Successfully set up sender transform')
-			return
-		}
+				console.log('🔐 Successfully set up sender transform')
+				return
+			}
 
-		// Otherwise if this is Chrome we'll have to use createEncodedStreams
-		if (
-			'createEncodedStreams' in sender &&
-			typeof sender.createEncodedStreams === 'function'
-		) {
-			const senderStreams = sender.createEncodedStreams()
-			const { readable, writable } = senderStreams
-			this.worker.postMessage(
-				{
-					type: 'encryptStream',
-					in: readable,
-					out: writable,
-				},
-				[readable, writable]
+			// Otherwise if this is Chrome we'll have to use createEncodedStreams
+			if (
+				'createEncodedStreams' in sender &&
+				typeof sender.createEncodedStreams === 'function'
+			) {
+				const senderStreams = sender.createEncodedStreams()
+				const { readable, writable } = senderStreams
+				this.worker.postMessage(
+					{
+						type: 'encryptStream',
+						in: readable,
+						out: writable,
+					},
+					[readable, writable]
+				)
+
+				console.log('🔐 Successfully set up sender transform')
+				return
+			}
+
+			throw new Error(
+				'Neither RTCRtpScriptTransform nor RTCRtpSender.createEncodedStreams methods supported'
 			)
-
-			console.log('🔐 Successfully set up sender transform')
-			return
+		} catch (error) {
+			console.error('🔐 Failed to set up sender transform:', error)
+			// Don't throw - allow the application to continue without E2EE for this track
 		}
-
-		throw new Error(
-			'Neither RTCRtpScriptTransform nor RTCRtpSender.createEncodedStreams methods supported'
-		)
 	}
 
 	async setupReceiverTransform(receiver: RTCRtpReceiver) {
 		console.log('🔐 Setting up receiver transform')
 
-		// If this is Firefox, we will have to use RTCRtpScriptTransform
-		if (window.RTCRtpScriptTransform) {
-			receiver.transform = new RTCRtpScriptTransform(this.worker, {
-				operation: 'decryptStream',
-			})
+		try {
+			// If this is Firefox, we will have to use RTCRtpScriptTransform
+			if (window.RTCRtpScriptTransform) {
+				receiver.transform = new RTCRtpScriptTransform(this.worker, {
+					operation: 'decryptStream',
+				})
 
-			console.log('🔐 Successfully set up receiver transform')
-			return
-		}
+				console.log('🔐 Successfully set up receiver transform')
+				return
+			}
 
-		// Otherwise if this is Chrome we'll have to use createEncodedStreams
-		if (
-			'createEncodedStreams' in receiver &&
-			typeof receiver.createEncodedStreams === 'function'
-		) {
-			const senderStreams = receiver.createEncodedStreams()
-			const { readable, writable } = senderStreams
-			this.worker.postMessage(
-				{
-					type: 'decryptStream',
-					in: readable,
-					out: writable,
-				},
-				[readable, writable]
+			// Otherwise if this is Chrome we'll have to use createEncodedStreams
+			if (
+				'createEncodedStreams' in receiver &&
+				typeof receiver.createEncodedStreams === 'function'
+			) {
+				const senderStreams = receiver.createEncodedStreams()
+				const { readable, writable } = senderStreams
+				this.worker.postMessage(
+					{
+						type: 'decryptStream',
+						in: readable,
+						out: writable,
+					},
+					[readable, writable]
+				)
+
+				console.log('🔐 Successfully set up receiver transform')
+				return
+			}
+
+			throw new Error(
+				'Neither RTCRtpScriptTransform nor RTCRtpSender.createEncodedStreams methods supported'
 			)
-
-			console.log('🔐 Successfully set up receiver transform')
-			return
+		} catch (error) {
+			console.error('🔐 Failed to set up receiver transform:', error)
+			// Don't throw - allow the application to continue without E2EE for this track
 		}
-
-		throw new Error(
-			'Neither RTCRtpScriptTransform nor RTCRtpSender.createEncodedStreams methods supported'
-		)
 	}
 
 	decryptStream(inStream: ReadableStream, outStream: WritableStream) {
@@ -307,6 +317,8 @@ export function useE2EE({
 	room: ReturnType<typeof useRoom>
 }) {
 	const [safetyNumber, setSafetyNumber] = useState<string>()
+	// Track removed users to prevent duplicate removal events
+	const removedUsersRef = useRef<Set<string>>(new Set())
 
 	const encryptionWorker = useMemo(
 		() =>
@@ -330,15 +342,21 @@ export function useE2EE({
 
 		const subscription = partyTracks.transceiver$.subscribe((transceiver) => {
 			if (transceiver.direction === 'sendonly') {
-				if (transceiver.sender.track?.kind === 'video') {
-					const capability = RTCRtpSender.getCapabilities('video')
-					const codecs = capability ? capability.codecs : []
-					const vp9codec = codecs.filter(
-						(a) => a.mimeType === 'video/VP9' || a.mimeType === 'video/rtx'
-					)
-					transceiver.setCodecPreferences(vp9codec)
+				try {
+					if (transceiver.sender.track?.kind === 'video') {
+						const capability = RTCRtpSender.getCapabilities('video')
+						const codecs = capability ? capability.codecs : []
+						const vp9codec = codecs.filter(
+							(a) => a.mimeType === 'video/VP9' || a.mimeType === 'video/rtx'
+						)
+						if (vp9codec.length > 0) {
+							transceiver.setCodecPreferences(vp9codec)
+						}
+					}
+					encryptionWorker.setupSenderTransform(transceiver.sender)
+				} catch (error) {
+					console.error('🔐 Failed to configure sender transceiver:', error)
 				}
-				encryptionWorker.setupSenderTransform(transceiver.sender)
 			}
 		})
 
@@ -352,7 +370,11 @@ export function useE2EE({
 
 		const subscription = partyTracks.transceiver$.subscribe((transceiver) => {
 			if (transceiver.direction === 'recvonly') {
-				encryptionWorker.setupReceiverTransform(transceiver.receiver)
+				try {
+					encryptionWorker.setupReceiverTransform(transceiver.receiver)
+				} catch (error) {
+					console.error('🔐 Failed to configure receiver transceiver:', error)
+				}
 			}
 		})
 
@@ -396,7 +418,14 @@ export function useE2EE({
 				encryptionWorker.handleIncomingEvent(message.payload)
 			}
 			if (message.type === 'userLeftNotification') {
-				encryptionWorker.userLeft(message.id)
+				// Deduplicate user removal events
+				if (!removedUsersRef.current.has(message.id)) {
+					console.log('👋 Processing user left:', message.id)
+					removedUsersRef.current.add(message.id)
+					encryptionWorker.userLeft(message.id)
+				} else {
+					console.log('👋 Ignoring duplicate user left:', message.id)
+				}
 			}
 		}
 
@@ -410,6 +439,8 @@ export function useE2EE({
 
 		return () => {
 			room.websocket.removeEventListener('message', handler)
+			// Clear removed users tracking when cleaning up
+			removedUsersRef.current.clear()
 		}
 	}, [encryptionWorker, firstUser, joined, room.websocket])
 

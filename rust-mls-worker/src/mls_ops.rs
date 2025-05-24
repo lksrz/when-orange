@@ -319,15 +319,24 @@ impl WorkerState {
                 .filter_map(|uid| uid_idx_map.get(&uid).copied())
                 .collect::<Vec<_>>();
 
-            // Remove them
-            let (commit, _, _) = group
-                .remove_members(
+            // Only attempt removal if we have valid indices
+            if !pending_remove_idxs.is_empty() {
+                // Remove them with proper error handling
+                match group.remove_members(
                     &self.mls_provider,
                     self.my_signing_keys.as_ref().unwrap(),
                     &pending_remove_idxs,
-                )
-                .expect("could not remove user");
-            Some(commit)
+                ) {
+                    Ok((commit, _, _)) => Some(commit),
+                    Err(e) => {
+                        info!("User removal failed (likely already removed): {e}");
+                        None
+                    }
+                }
+            } else {
+                info!("No valid users found to remove (likely already removed)");
+                None
+            }
         } else {
             None
         };
@@ -365,17 +374,25 @@ impl WorkerState {
     /// removed from the room,  but not yet been removed from the MLS group.
     /// If this user has not yet been welcomed, they add this to the pending removes and log the UID
     /// as one they will not consider a DC candidate.
-    /// This will panic if a user tries to remove themselves.
+    /// This will return early if a user tries to remove themselves or if already pending removal.
     fn user_left(&mut self, uid_to_remove: &[u8]) -> WorkerResponse {
         if uid_to_remove == self.uid() {
-            panic!("cannot remove self");
+            info!("Ignoring attempt to remove self");
+            return WorkerResponse::default();
+        }
+
+        let uid_vec = uid_to_remove.to_vec();
+        
+        // Check if already pending removal
+        if self.pending_removes.contains(&uid_vec) || self.users_who_left_since_i_joined.contains(&uid_vec) {
+            info!("User already marked for removal, ignoring duplicate");
+            return WorkerResponse::default();
         }
 
         // Add this user to the pending removes
-        self.pending_removes.push(uid_to_remove.to_vec());
+        self.pending_removes.push(uid_vec.clone());
         // Mark this user as left
-        self.users_who_left_since_i_joined
-            .insert(uid_to_remove.to_vec());
+        self.users_who_left_since_i_joined.insert(uid_vec);
 
         // Process pending adds/removes (only does anything if we're the DC)
         self.process_pendings()
@@ -403,7 +420,8 @@ impl WorkerState {
                 return WorkerResponse::default();
             }
             Err(e) => {
-                panic!("could not process message: {e}")
+                info!("Could not process message: {e}");
+                return WorkerResponse::default();
             }
         };
         if let ProcessedMessageContent::StagedCommitMessage(staged_com) = processed_message {
@@ -423,9 +441,10 @@ impl WorkerState {
                 .collect();
 
             // Merge the Commit into the group state
-            group
-                .merge_staged_commit(&self.mls_provider, *staged_com)
-                .expect("couldn't merge commit");
+            if let Err(e) = group.merge_staged_commit(&self.mls_provider, *staged_com) {
+                info!("Couldn't merge commit: {e}");
+                return WorkerResponse::default();
+            }
 
             // After successful add, remove the UIDs from the pending list. In other words, retain
             // the UIDs that aren't in the pending list
@@ -441,7 +460,8 @@ impl WorkerState {
                 ..Default::default()
             }
         } else {
-            panic!("expected Commit message")
+            info!("Expected Commit message, got different type");
+            WorkerResponse::default()
         }
     }
 
@@ -616,12 +636,19 @@ pub fn remove_user(uid_to_remove: &str) -> WorkerResponse {
 
     STATE
         .try_with(|mutex| {
-            mutex
-                .lock()
-                .expect("couldn't lock mutex")
-                .user_left(uid_bytes)
+            // Use try_lock to prevent recursive mutex acquisition
+            match mutex.try_lock() {
+                Ok(mut state) => state.user_left(uid_bytes),
+                Err(_) => {
+                    info!("Mutex already locked, likely processing another removal. Skipping duplicate removal.");
+                    WorkerResponse::default()
+                }
+            }
         })
-        .expect("couldn't acquire thread-local storage")
+        .unwrap_or_else(|_| {
+            info!("Couldn't acquire thread-local storage for user removal");
+            WorkerResponse::default()
+        })
 }
 
 /// Acquires the global state and joins the group given by the welcome package and ratchet tree
