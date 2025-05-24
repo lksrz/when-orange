@@ -82,7 +82,8 @@ export const Participant = forwardRef<
 	const pulledAudioTrack = usePulledAudioTrack(
 		isScreenShare ? undefined : user.tracks.audio
 	)
-	const shouldPullVideo = isScreenShare || (!isSelf && !dataSaverMode)
+	const shouldPullVideo =
+		(isScreenShare && !isSelf) || (!isSelf && !dataSaverMode)
 	let preferredRid: string | undefined = undefined
 	if (!isScreenShare && simulcastEnabled) {
 		// If datasaver mode is off, we want server-side bandwidth estimation and switching
@@ -95,12 +96,16 @@ export const Participant = forwardRef<
 	)
 	const audioTrack = isSelf ? userMedia.audioStreamTrack : pulledAudioTrack
 	const videoTrack =
-		isSelf && !isScreenShare ? userMedia.videoStreamTrack : pulledVideoTrack
+		isSelf && !isScreenShare
+			? userMedia.videoStreamTrack
+			: isSelf && isScreenShare
+				? userMedia.screenShareVideoTrack
+				: pulledVideoTrack
 
 	useDeadPulledTrackMonitor(
-		user.tracks.video,
+		shouldPullVideo ? user.tracks.video : undefined,
 		user.transceiverSessionId,
-		!!user.tracks.video,
+		!!user.tracks.video && shouldPullVideo,
 		videoTrack,
 		user.name
 	)

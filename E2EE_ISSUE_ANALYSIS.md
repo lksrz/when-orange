@@ -6,6 +6,8 @@ E2EE functionality was broken with persistent frame decryption failures, epoch s
 
 **Status: RESOLVED** - Fixed by reverting to the proven cloudflare-new implementation approach.
 
+**UPDATE (2025-01-24)**: Additional fix applied for screen sharer self-view issue.
+
 ## Previous Symptoms (Now Fixed)
 
 ### 1. **Wrong Epoch Errors**
@@ -30,7 +32,18 @@ E2EE functionality was broken with persistent frame decryption failures, epoch s
 - Results in blank video streams for remote participants
 - Audio and video tracks affected
 
-### 3. **WebRTC Parameter Errors**
+### 3. **Screen Sharing Self-View Issue** (NEW)
+
+```
+[Info] Frame decryption failed: Cannot create decryption secrets from own sender ratchet or encryption secrets from the sender ratchets of other members.
+[Error] This is the wrong ratchet type.
+```
+
+- Screen sharers couldn't see their own shared screen
+- Users were trying to decrypt their own encrypted frames
+- MLS protocol correctly prevents self-decryption for security
+
+### 4. **WebRTC Parameter Errors**
 
 ```
 [Error] Unhandled Promise Rejection: InvalidModificationError: parameters are not valid
@@ -39,7 +52,7 @@ E2EE functionality was broken with persistent frame decryption failures, epoch s
 - setParameters calls failing in WebRTC stack
 - Likely related to codec preferences or encoder settings
 
-### 4. **Deprecated MLS Warnings**
+### 5. **Deprecated MLS Warnings**
 
 ```
 [Warning] using deprecated parameters for the initialization function; pass a single object instead
