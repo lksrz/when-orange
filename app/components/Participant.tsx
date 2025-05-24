@@ -68,7 +68,7 @@ export const Participant = forwardRef<
 		showDebugInfo,
 		userMedia,
 		room: { identity },
-		e2eeReady,
+		e2eeSafetyNumber,
 		simulcastEnabled,
 	} = useRoomContext()
 	const peerConnection = useObservableAsValue(partyTracks.peerConnection$)
@@ -276,7 +276,7 @@ export const Participant = forwardRef<
 							</OptionalLink>
 						</div>
 					)}
-					<E2EEIndicator isEncrypted={e2eeReady} />
+					<E2EEIndicator isEncrypted={!!e2eeSafetyNumber} />
 					<div className="absolute top-0 right-0 flex gap-4 p-4">
 						{user.raisedHand && !isScreenShare && (
 							<Tooltip content="Hand is raised">

@@ -212,7 +212,7 @@ function Room({ room, userMedia }: RoomProps) {
 	const [showDebugInfo, setShowDebugInfo] = useState(false)
 
 	// E2EE integration
-	const { e2eeSafetyNumber, e2eeReady, onJoin } = useE2EE({
+	const { e2eeSafetyNumber, onJoin } = useE2EE({
 		enabled: e2eeEnabled,
 		room,
 		partyTracks,
@@ -240,7 +240,6 @@ function Room({ room, userMedia }: RoomProps) {
 		simulcastEnabled,
 		e2eeEnabled,
 		e2eeSafetyNumber,
-		e2eeReady,
 		e2eeOnJoin: onJoin,
 		pushedTracks: {
 			video: trackObjectToString(pushedVideoTrack),

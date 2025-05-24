@@ -103,24 +103,14 @@ export class EncryptionWorker {
 	_worker: Worker | null = null
 	safetyNumber: number = -1
 	id: string
-	ready: boolean = false
 
 	constructor(config: { id: string }) {
 		this.id = config.id
 		this._worker = new Worker('/e2ee/worker.js')
-
-		// Listen for worker ready signal
-		this._worker.addEventListener('message', (event) => {
-			if (event.data.type === 'workerReady') {
-				this.ready = true
-			}
-		})
 	}
 
 	dispose() {
-		this._worker?.terminate()
-		this._worker = null
-		this.ready = false
+		this.worker.terminate()
 	}
 
 	initialize() {
@@ -162,12 +152,7 @@ export class EncryptionWorker {
 		const trackKind = sender.track?.kind
 		const trackId = sender.track?.id
 
-		console.log(
-			'🔐 Setting up sender transform for',
-			trackKind,
-			'trackId:',
-			trackId
-		)
+		console.log('🔐 Setting up sender transform')
 
 		// If this is Firefox, we will have to use RTCRtpScriptTransform
 		if (window.RTCRtpScriptTransform) {
@@ -175,12 +160,7 @@ export class EncryptionWorker {
 				operation: 'encryptStream',
 			})
 
-			console.log(
-				'🔐 Successfully set up sender transform for',
-				trackKind,
-				'trackId:',
-				trackId
-			)
+			console.log('🔐 Successfully set up sender transform')
 			return
 		}
 
@@ -200,12 +180,7 @@ export class EncryptionWorker {
 				[readable, writable]
 			)
 
-			console.log(
-				'🔐 Successfully set up sender transform for',
-				trackKind,
-				'trackId:',
-				trackId
-			)
+			console.log('🔐 Successfully set up sender transform')
 			return
 		}
 
@@ -215,15 +190,7 @@ export class EncryptionWorker {
 	}
 
 	async setupReceiverTransform(receiver: RTCRtpReceiver) {
-		const trackId = receiver.track?.id
-		const trackKind = receiver.track?.kind
-
-		console.log(
-			'🔐 Setting up receiver transform for remote track:',
-			trackId,
-			'kind:',
-			trackKind
-		)
+		console.log('🔐 Setting up receiver transform')
 
 		// If this is Firefox, we will have to use RTCRtpScriptTransform
 		if (window.RTCRtpScriptTransform) {
@@ -231,10 +198,7 @@ export class EncryptionWorker {
 				operation: 'decryptStream',
 			})
 
-			console.log(
-				'🔐 Successfully set up receiver transform (Firefox) for track:',
-				trackId
-			)
+			console.log('🔐 Successfully set up receiver transform')
 			return
 		}
 
@@ -254,10 +218,7 @@ export class EncryptionWorker {
 				[readable, writable]
 			)
 
-			console.log(
-				'🔐 Successfully set up receiver transform (Chrome) for track:',
-				trackId
-			)
+			console.log('🔐 Successfully set up receiver transform')
 			return
 		}
 
@@ -346,7 +307,6 @@ export function useE2EE({
 	room: ReturnType<typeof useRoom>
 }) {
 	const [safetyNumber, setSafetyNumber] = useState<string>()
-	const [workerReady, setWorkerReady] = useState(false)
 
 	const encryptionWorker = useMemo(
 		() =>
@@ -365,31 +325,8 @@ export function useE2EE({
 		}
 	}, [encryptionWorker])
 
-	// Track worker readiness
 	useEffect(() => {
 		if (!enabled) return
-
-		const checkReady = () => {
-			if (encryptionWorker.ready && !workerReady) {
-				setWorkerReady(true)
-			}
-		}
-
-		// Check immediately
-		checkReady()
-
-		// Check periodically until ready
-		const interval = setInterval(() => {
-			checkReady()
-		}, 100)
-
-		return () => {
-			clearInterval(interval)
-		}
-	}, [enabled, encryptionWorker, workerReady])
-
-	useEffect(() => {
-		if (!enabled || !joined || !workerReady) return
 
 		const subscription = partyTracks.transceiver$.subscribe((transceiver) => {
 			if (transceiver.direction === 'sendonly') {
@@ -408,10 +345,10 @@ export function useE2EE({
 		return () => {
 			subscription.unsubscribe()
 		}
-	}, [enabled, joined, workerReady, encryptionWorker, partyTracks.transceiver$])
+	}, [enabled, encryptionWorker, partyTracks.transceiver$])
 
 	useEffect(() => {
-		if (!enabled || !joined || !workerReady) return
+		if (!enabled) return
 
 		const subscription = partyTracks.transceiver$.subscribe((transceiver) => {
 			if (transceiver.direction === 'recvonly') {
@@ -422,7 +359,7 @@ export function useE2EE({
 		return () => {
 			subscription.unsubscribe()
 		}
-	}, [enabled, joined, workerReady, encryptionWorker, partyTracks.transceiver$])
+	}, [enabled, encryptionWorker, partyTracks.transceiver$])
 
 	const onJoin = useCallback(
 		(firstUser: boolean) => {
@@ -434,16 +371,14 @@ export function useE2EE({
 	)
 
 	useEffect(() => {
-		if (!joined || !workerReady) return
-
-		console.log('🔐 Setting up E2EE for', firstUser ? 'first user' : 'joining user')
+		if (!joined) return
 
 		encryptionWorker.onNewSafetyNumber((buffer) => {
 			const safetyNum = arrayBufferToDecimal(buffer)
 			console.log('🔐 Safety number generated:', safetyNum)
 			setSafetyNumber(safetyNum)
 		})
-		
+
 		encryptionWorker.handleOutgoingEvents((data) => {
 			console.log('📬 sending e2eeMlsMessage to peers', data)
 			room.websocket.send(
@@ -453,7 +388,7 @@ export function useE2EE({
 				})
 			)
 		})
-		
+
 		const handler = (event: MessageEvent) => {
 			const message = JSON.parse(event.data) as ServerMessage
 			if (message.type === 'e2eeMlsMessage') {
@@ -467,35 +402,19 @@ export function useE2EE({
 
 		room.websocket.addEventListener('message', handler)
 
-		// Initialize after handlers are set up
 		if (firstUser) {
-			console.log('🔐 Initializing and creating group as first user')
 			encryptionWorker.initializeAndCreateGroup()
 		} else {
-			console.log('🔐 Initializing worker as joining user')
 			encryptionWorker.initialize()
 		}
 
 		return () => {
 			room.websocket.removeEventListener('message', handler)
 		}
-	}, [encryptionWorker, firstUser, joined, workerReady, room.websocket])
-
-	// Log ready state changes for debugging
-	useEffect(() => {
-		const isReady = enabled && workerReady && joined
-		console.log('🔐 E2EE ready state changed:', {
-			enabled,
-			workerReady,
-			joined,
-			isReady,
-			safetyNumber: !!safetyNumber,
-		})
-	}, [enabled, workerReady, joined, safetyNumber])
+	}, [encryptionWorker, firstUser, joined, room.websocket])
 
 	return {
 		e2eeSafetyNumber: enabled ? safetyNumber : undefined,
-		e2eeReady: enabled && workerReady && joined,
 		onJoin,
 	}
 }

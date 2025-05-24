@@ -27,7 +27,6 @@ export type RoomContextType = {
 	simulcastEnabled: boolean
 	e2eeEnabled: boolean
 	e2eeSafetyNumber?: string
-	e2eeReady: boolean
 	e2eeOnJoin: (firstUser: boolean) => void
 	pushedTracks: {
 		video?: string
