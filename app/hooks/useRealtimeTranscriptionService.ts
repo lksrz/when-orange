@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 interface RealtimeTranscriptionOptions {
   enabled: boolean
   transcriptionProvider?: string
+  onTranscriptionWithSpeaker?: (text: string, speakerId?: string, speakerName?: string) => void
 }
 
 /**
@@ -14,7 +15,7 @@ export function useRealtimeTranscriptionService(
   tracks: MediaStreamTrack[] = [],
   options: RealtimeTranscriptionOptions = { enabled: false }
 ) {
-  const { enabled, transcriptionProvider } = options
+  const { enabled, transcriptionProvider, onTranscriptionWithSpeaker } = options
   const [isActive, setIsActive] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<Error | null>(null)
@@ -24,6 +25,9 @@ export function useRealtimeTranscriptionService(
   const peerConnectionRef = useRef<RTCPeerConnection | null>(null)
   const dataChannelRef = useRef<RTCDataChannel | null>(null)
   const ephemeralTokenRef = useRef<string | null>(null)
+  
+  // Track ongoing transcription timing for speaker correlation
+  const ongoingTranscriptions = useRef<Map<string, { startTime: number }>>(new Map())
   
   // Only use realtime if explicitly enabled and provider is openai-realtime
   const useRealtime = enabled && transcriptionProvider === 'openai-realtime'
@@ -102,15 +106,46 @@ export function useRealtimeTranscriptionService(
       dc.addEventListener('message', (event) => {
         try {
           const data = JSON.parse(event.data)
+          const now = Date.now()
+          
+          // Track transcription timing for speaker correlation
+          if (data.type === 'input_audio_buffer.speech_started') {
+            const itemId = data.item_id
+            if (itemId) {
+              ongoingTranscriptions.current.set(itemId, { startTime: now })
+              console.log('🎤 OpenAI Realtime: Speech started for item:', itemId)
+            }
+          }
           
           // Only handle completed transcriptions, not deltas (to avoid duplicates)
-          if (data.type === 'conversation.item.input_audio_transcription.completed') {
+          else if (data.type === 'conversation.item.input_audio_transcription.completed') {
             const text = data.transcript?.trim()
-            if (text) {
-              console.log('🎤 OpenAI Realtime: Received transcript:', text)
+            const itemId = data.item_id
+            
+            if (text && itemId) {
+              // Get timing info for this transcription
+              const timingInfo = ongoingTranscriptions.current.get(itemId)
+              const startTime = timingInfo?.startTime || (now - 2000) // Default to 2 seconds ago if no start time
+              const endTime = now
+              
+              console.log('🎤 OpenAI Realtime: Received transcript:', {
+                text,
+                itemId,
+                startTime,
+                endTime,
+                duration: endTime - startTime
+              })
               
               // Add to local state
               setTranscripts(prev => [...prev, text])
+              
+              // Call the speaker-aware callback if provided
+              if (onTranscriptionWithSpeaker) {
+                onTranscriptionWithSpeaker(text, undefined, undefined) // Will be filled by parent component
+              }
+              
+              // Clean up timing info
+              ongoingTranscriptions.current.delete(itemId)
             }
           }
           // Ignore other message types for now to reduce noise

@@ -9,6 +9,9 @@ type Props = {
   isActive: boolean
   participants: string[]
   provider?: string
+  speakerTracker?: {
+    getPrimarySpeaker: (startTime: number, endTime: number) => { userId: string; userName: string; duration: number } | null
+  }
 }
 
 /**
@@ -24,14 +27,16 @@ export const TranscriptionServiceWrapper: React.FC<Props> = ({
   onTranscription,
   isActive,
   participants: _participants,
-  provider = 'openai'
+  provider = 'openai',
+  speakerTracker
 }) => {
   // Use our factory hook to get the appropriate transcription service
   const { transcripts } = useTranscriptionServiceFactory(
     audioTracks,
     {
       enabled: isActive,
-      provider
+      provider,
+      speakerTracker
     }
   )
   

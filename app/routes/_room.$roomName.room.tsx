@@ -29,6 +29,7 @@ import Toast from '~/components/Toast'
 import { TranscriptionPanel } from '~/components/TranscriptionPanel'
 import { TranscriptionServiceWrapper } from '~/components/TranscriptionServiceWrapper'
 import { getTranscriptionProvider } from '~/config/featureFlags'
+import { useSpeakerTracker } from '~/hooks/useSpeakerTracker'
 import useBroadcastStatus from '~/hooks/useBroadcastStatus'
 import useIsSpeaking from '~/hooks/useIsSpeaking'
 import { useMobileViewportHeight } from '~/hooks/useMobileViewportHeight'
@@ -254,6 +255,57 @@ function JoinedRoom({
 	}
 
 	const [transcriptions, setTranscriptions] = useState<Transcription[]>([])
+	
+	// Initialize speaker tracker for correlating speech with transcriptions
+	const speakerTracker = useSpeakerTracker()
+	
+	// Track speaking status for yourself
+	const userIsSpeaking = useIsSpeaking(userMedia.audioStreamTrack)
+	
+	// Track speaking status for other users using pulled audio tracks
+	const otherUsersSpeaking = useMemo(() => {
+		const speakingStatus: Record<string, boolean> = {}
+		
+		otherUsers.forEach(user => {
+			// Get the actual audio track for this user
+			const audioTrackId = user.tracks.audio
+			const audioTrack = audioTrackId ? pulledAudioTracks[audioTrackId] : null
+			
+			// Use the speaking detection hook for remote tracks
+			// Note: We'll need to create individual hooks for each user
+			speakingStatus[user.id] = false // Will be updated by individual useIsSpeaking hooks
+		})
+		
+		return speakingStatus
+	}, [otherUsers, pulledAudioTracks])
+	
+	// Create speaking detection for each remote user
+	const remoteUserSpeakingStates = useMemo(() => {
+		const states: Record<string, boolean> = {}
+		otherUsers.forEach(user => {
+			const audioTrackId = user.tracks.audio
+			const audioTrack = audioTrackId ? pulledAudioTracks[audioTrackId] : null
+			// We'll update this in a separate effect since hooks can't be called conditionally
+		})
+		return states
+	}, [otherUsers, pulledAudioTracks])
+	
+	// Update speaker tracker when speaking status changes
+	useEffect(() => {
+		if (identity?.id && identity?.name) {
+			speakerTracker.updateSpeakerStatus(identity.id, identity.name, userIsSpeaking)
+		}
+	}, [userIsSpeaking, identity?.id, identity?.name, speakerTracker])
+	
+	// Update speaker tracker for other users (placeholder for now)
+	useEffect(() => {
+		otherUsers.forEach(user => {
+			if (user.id && user.name) {
+				const isSpeaking = otherUsersSpeaking[user.id] || false
+				speakerTracker.updateSpeakerStatus(user.id, user.name, isSpeaking)
+			}
+		})
+	}, [otherUsers, otherUsersSpeaking, speakerTracker])
 
 	const isTranscriptionHost = useMemo(() => {
 		// Only proceed if we have our own identity
@@ -439,8 +491,31 @@ function JoinedRoom({
 					audioTracks={actualAudioTracks}
 					isActive={isTranscriptionHost}
 					participants={participantNames}
-					onTranscription={(t) => setTranscriptions((prev) => [...prev, t])}
+					onTranscription={(t) => {
+						// Enhanced transcription callback with speaker detection
+						const now = Date.now()
+						const transcriptionStart = now - 2000 // Estimate 2 seconds ago
+						const primarySpeaker = speakerTracker.getPrimarySpeaker(transcriptionStart, now)
+						
+						// Create enhanced transcription with speaker info
+						const enhancedTranscription: Transcription = {
+							...t,
+							speaker: primarySpeaker?.userName || t.speaker || 'Unknown',
+							userId: primarySpeaker?.userId || t.userId
+						}
+						
+						console.log('🎤 Enhanced transcription:', {
+							text: t.text,
+							originalSpeaker: t.speaker,
+							detectedSpeaker: primarySpeaker?.userName,
+							speakerId: primarySpeaker?.userId,
+							speakingDuration: primarySpeaker?.duration
+						})
+						
+						setTranscriptions((prev) => [...prev, enhancedTranscription])
+					}}
 					provider={getTranscriptionProvider()}
+					speakerTracker={speakerTracker}
 				/>
 			)}
 			{transcriptionEnabled && (
