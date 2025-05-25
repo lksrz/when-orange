@@ -93,8 +93,10 @@ export const TranscriptionService: React.FC<Props> = ({
 	const sendAudioChunkToWhisper = useCallback(
 		async (audioBlob: Blob, token: string) => {
 			try {
-				console.log(`🎤 OpenAI: Sending audio chunk (${audioBlob.size} bytes) to Whisper API`)
-				
+				console.log(
+					`🎤 OpenAI: Sending audio chunk (${audioBlob.size} bytes) to Whisper API`
+				)
+
 				const formData = new FormData()
 				formData.append('file', audioBlob, 'audio.wav')
 				formData.append('model', 'whisper-1')
@@ -116,7 +118,9 @@ export const TranscriptionService: React.FC<Props> = ({
 					const data = (await response.json()) as { text?: string }
 					console.log(`🎤 OpenAI Whisper: Received transcript: "${data.text}"`)
 					if (data.text && data.text.trim()) {
-						console.log(`🎤 OpenAI Whisper: Adding valid transcript: "${data.text}"`)
+						console.log(
+							`🎤 OpenAI Whisper: Adding valid transcript: "${data.text}"`
+						)
 						onTranscription({
 							id: `whisper_${Date.now()}_${Math.random()}`,
 							text: data.text,
@@ -125,11 +129,17 @@ export const TranscriptionService: React.FC<Props> = ({
 							speaker: 'OpenAI Whisper',
 						})
 					} else {
-						console.log(`🎤 OpenAI Whisper: Ignoring empty/whitespace transcript`)
+						console.log(
+							`🎤 OpenAI Whisper: Ignoring empty/whitespace transcript`
+						)
 					}
 				} else {
 					const errorText = await response.text()
-					console.error('🎤 OpenAI Whisper: API error:', response.status, errorText)
+					console.error(
+						'🎤 OpenAI Whisper: API error:',
+						response.status,
+						errorText
+					)
 				}
 			} catch (error) {
 				console.error('🎤 OpenAI Whisper: Request failed:', error)
@@ -142,9 +152,16 @@ export const TranscriptionService: React.FC<Props> = ({
 	const setupAudioProcessing = useCallback(
 		(stream: MediaStream, token: string) => {
 			console.log('🎤 OpenAI: Setting up audio processing for Whisper API')
-			console.log('🎤 OpenAI: Stream tracks:', stream.getTracks().map(t => `${t.kind}: ${t.enabled}, ${t.readyState}, muted: ${t.muted}`))
+			console.log(
+				'🎤 OpenAI: Stream tracks:',
+				stream
+					.getTracks()
+					.map(
+						(t) => `${t.kind}: ${t.enabled}, ${t.readyState}, muted: ${t.muted}`
+					)
+			)
 			console.log('🎤 OpenAI: Stream active:', stream.active)
-			
+
 			// Clean up existing audio context
 			if (audioContextRef.current) {
 				audioContextRef.current.close()
@@ -155,7 +172,10 @@ export const TranscriptionService: React.FC<Props> = ({
 			audioContextRef.current = audioContext
 
 			console.log('🎤 OpenAI: Audio context state:', audioContext.state)
-			console.log('🎤 OpenAI: Audio context sample rate:', audioContext.sampleRate)
+			console.log(
+				'🎤 OpenAI: Audio context sample rate:',
+				audioContext.sampleRate
+			)
 
 			// Resume audio context if suspended
 			if (audioContext.state === 'suspended') {
@@ -193,15 +213,20 @@ export const TranscriptionService: React.FC<Props> = ({
 
 					// Calculate RMS to check if there's actual audio
 					const rms = calculateRMS(combinedBuffer)
-					
+
 					// Log occasionally to debug
-					if (Math.random() < 0.1) { // 10% of the time
-						console.log(`🎤 OpenAI: Audio RMS level: ${rms.toFixed(4)}, Min threshold: ${MIN_AUDIO_LEVEL}`)
+					if (Math.random() < 0.1) {
+						// 10% of the time
+						console.log(
+							`🎤 OpenAI: Audio RMS level: ${rms.toFixed(4)}, Min threshold: ${MIN_AUDIO_LEVEL}`
+						)
 					}
 
 					if (rms > MIN_AUDIO_LEVEL) {
-						console.log(`🎤 OpenAI: Processing audio chunk (${combinedBuffer.length} samples, RMS: ${rms.toFixed(4)})`)
-						
+						console.log(
+							`🎤 OpenAI: Processing audio chunk (${combinedBuffer.length} samples, RMS: ${rms.toFixed(4)})`
+						)
+
 						// Create audio buffer for conversion
 						const audioBufferObj = audioContext.createBuffer(
 							1,
@@ -216,8 +241,11 @@ export const TranscriptionService: React.FC<Props> = ({
 						sendAudioChunkToWhisper(audioBlob, token)
 					} else {
 						// Log when audio is too quiet
-						if (Math.random() < 0.01) { // 1% of the time
-							console.log(`🎤 OpenAI: Audio too quiet (RMS: ${rms.toFixed(4)}), skipping`)
+						if (Math.random() < 0.01) {
+							// 1% of the time
+							console.log(
+								`🎤 OpenAI: Audio too quiet (RMS: ${rms.toFixed(4)}), skipping`
+							)
 						}
 					}
 
@@ -235,12 +263,20 @@ export const TranscriptionService: React.FC<Props> = ({
 
 	useEffect(() => {
 		if (!isActive || audioTracks.length === 0) {
-			console.log('🎤 OpenAI: Not starting - isActive:', isActive, 'audioTracks:', audioTracks.length)
+			console.log(
+				'🎤 OpenAI: Not starting - isActive:',
+				isActive,
+				'audioTracks:',
+				audioTracks.length
+			)
 			return
 		}
 
 		console.log('🎤 OpenAI: Starting Whisper transcription service')
-		console.log('🎤 OpenAI: Audio tracks:', audioTracks.map(t => `${t.kind}: ${t.enabled}, ${t.readyState}`))
+		console.log(
+			'🎤 OpenAI: Audio tracks:',
+			audioTracks.map((t) => `${t.kind}: ${t.enabled}, ${t.readyState}`)
+		)
 
 		let isCleanedUp = false
 
@@ -257,25 +293,22 @@ export const TranscriptionService: React.FC<Props> = ({
 
 				if (isCleanedUp) return
 
-                               // Setup audio processing with Whisper API
-                               // Combine all available audio tracks so we can
-                               // capture remote participants as well as the
-                               // local microphone. If the browser does not
-                               // support mixing multiple tracks, it will fall
-                               // back to the first track.
-                               const validTracks = audioTracks.filter(
-                                       (t) => t && t.readyState === 'live'
-                               )
-                               const trackInfo = validTracks.map(
-                                       (t) => `${t.id}:${t.kind}:${t.readyState}`
-                               )
-                               console.log(
-                                       '🎤 OpenAI: Using audio tracks:',
-                                       trackInfo
-                               )
+				// Setup audio processing with Whisper API
+				// Combine all available audio tracks so we can
+				// capture remote participants as well as the
+				// local microphone. If the browser does not
+				// support mixing multiple tracks, it will fall
+				// back to the first track.
+				const validTracks = audioTracks.filter(
+					(t) => t && t.readyState === 'live'
+				)
+				const trackInfo = validTracks.map(
+					(t) => `${t.id}:${t.kind}:${t.readyState}`
+				)
+				console.log('🎤 OpenAI: Using audio tracks:', trackInfo)
 
-                               const combinedStream = new MediaStream(validTracks)
-                               setupAudioProcessing(combinedStream, token)
+				const combinedStream = new MediaStream(validTracks)
+				setupAudioProcessing(combinedStream, token)
 			} catch (error) {
 				console.error('🎤 OpenAI: TranscriptionService error:', error)
 			}
@@ -297,11 +330,7 @@ export const TranscriptionService: React.FC<Props> = ({
 				processorRef.current = null
 			}
 		}
-	}, [
-		isActive,
-		audioTracks,
-		setupAudioProcessing,
-	])
+	}, [isActive, audioTracks, setupAudioProcessing])
 
 	return null // No UI, just a service
 }
