@@ -34,7 +34,7 @@ import { useMobileViewportHeight } from '~/hooks/useMobileViewportHeight'
 import { useRoomContext } from '~/hooks/useRoomContext'
 import { useShowDebugInfoShortcut } from '~/hooks/useShowDebugInfoShortcut'
 import useSounds from '~/hooks/useSounds'
-import useStageManager from '~/hooks/useStageManager'
+import useStageManager, { screenshareSuffix } from '~/hooks/useStageManager'
 import { useUserJoinLeaveToasts } from '~/hooks/useUserJoinLeaveToasts'
 import getUsername from '~/utils/getUsername.server'
 import isNonNullable from '~/utils/isNonNullable'
@@ -173,12 +173,17 @@ function JoinedRoom({
 	useSounds(otherUsers)
 	useUserJoinLeaveToasts(otherUsers)
 
-	const { width } = useWindowSize()
+	const { width, height } = useWindowSize()
+	const isMobilePortrait = width < 600 && width < height
 
 	const someScreenshare =
 		otherUsers.some((u) => u.tracks.screenshare) ||
 		Boolean(identity?.tracks.screenshare)
-	const stageLimit = width < 600 ? 2 : someScreenshare ? 5 : 8
+	// Increase stage limit for mobile to ensure all participants are visible
+	// In portrait mode with screenshare, we need at least the screensharer + other participants
+	const stageLimit = width < 600 
+		? (isMobilePortrait && someScreenshare ? Math.max(4, otherUsers.length + 1) : 3) 
+		: someScreenshare ? 5 : 8
 
 	const { recordActivity, actorsOnStage } = useStageManager(
 		otherUsers,
@@ -192,10 +197,48 @@ function JoinedRoom({
 		})
 	}, [otherUsers, recordActivity])
 
-	const pinnedActors = actorsOnStage.filter((u) => pinnedTileIds.includes(u.id))
-	const unpinnedActors = actorsOnStage.filter(
-		(u) => !pinnedTileIds.includes(u.id)
-	)
+	// Find screen sharing actors first - they should always be prioritized
+	// Screen share actors have IDs ending with the screenshareSuffix
+	const screenSharingActors = actorsOnStage.filter((u) => u.id.endsWith(screenshareSuffix))
+	const nonScreenSharingActors = actorsOnStage.filter((u) => !u.id.endsWith(screenshareSuffix))
+	
+	// For desktop/tablet layout, screen sharers are always pinned and shown as main
+	const pinnedActors = screenSharingActors.length > 0 
+		? screenSharingActors 
+		: actorsOnStage.filter((u) => pinnedTileIds.includes(u.id))
+	const unpinnedActors = screenSharingActors.length > 0
+		? nonScreenSharingActors
+		: actorsOnStage.filter((u) => !pinnedTileIds.includes(u.id))
+
+	// Determine actors for the special mobile screenshare layout
+	let mobileLayoutScreenActor: (typeof actorsOnStage)[0] | null = null
+	let mobileLayoutRowActors: typeof actorsOnStage = []
+
+	if (isMobilePortrait && someScreenshare) {
+		// Find the screen sharing actor (prioritize local user if they're sharing)
+		const localUserIsSharing = !!identity?.tracks.screenshare
+
+		if (localUserIsSharing && identity) {
+			// If local user is sharing, they MUST be the main screen actor.
+			// Look for the screenshare version of the local user
+			mobileLayoutScreenActor =
+				actorsOnStage.find((actor) => actor.id === identity.id + screenshareSuffix) || null
+		} else {
+			// Pick the first screen sharer from the stage
+			mobileLayoutScreenActor =
+				actorsOnStage.find((actor) => actor.id.endsWith(screenshareSuffix)) || null
+		}
+
+		// If we found a screen sharer, all others go to the row below
+		if (mobileLayoutScreenActor) {
+			mobileLayoutRowActors = actorsOnStage.filter(
+				(actor) => actor.id !== mobileLayoutScreenActor!.id
+			)
+		} else {
+			// Fallback: no screen sharer found on stage
+			mobileLayoutRowActors = actorsOnStage
+		}
+	}
 
 	interface Transcription {
 		id: string
@@ -264,25 +307,69 @@ function JoinedRoom({
 			<div className="h-mobile-screen flex flex-col bg-white">
 				<div className="flex-1 relative overflow-hidden">
 					<div
-						className="absolute inset-0 flex isolate gap-[var(--gap)] p-2 sm:p-[var(--gap)]"
+						className={`absolute inset-0 isolate p-2 pb-0 ${
+							isMobilePortrait && someScreenshare ? 'flex flex-col' : 'flex'
+						} gap-[var(--gap)]`}
 						style={
 							{
-								'--gap': '1rem',
+								'--gap': '0.5rem',
 							} as any
 						}
 					>
-						{pinnedActors.length > 0 && (
-							<div className="flex-grow-[5] overflow-hidden relative">
-								<ParticipantLayout users={pinnedActors.filter(isNonNullable)} />
-							</div>
+						{isMobilePortrait && someScreenshare ? (
+							<>
+								{mobileLayoutScreenActor && (
+									<div className="w-full flex-1 overflow-hidden relative">
+										<ParticipantLayout
+											users={[mobileLayoutScreenActor].filter(isNonNullable)}
+										/>
+									</div>
+								)}
+								{mobileLayoutRowActors.length > 0 && (
+									<div className="w-full flex-shrink-0 overflow-hidden relative" style={{ height: 'min(25vh, 150px)' }}>
+										<div className="h-full flex gap-2 px-2">
+											{mobileLayoutRowActors.slice(0, 3).map((actor) => (
+												<div key={actor.id} className="flex-1 h-full relative overflow-hidden rounded-lg">
+													<ParticipantLayout
+														users={[actor].filter(isNonNullable)}
+													/>
+												</div>
+											))}
+										</div>
+										{mobileLayoutRowActors.length > 3 && (
+											<div className="absolute bottom-1 right-2 bg-black/50 text-white text-xs px-2 py-1 rounded">
+												+{mobileLayoutRowActors.length - 3} more
+											</div>
+										)}
+									</div>
+								)}
+							</>
+						) : (
+							<>
+								{pinnedActors.length > 0 && (
+									<div className="flex-grow-[5] overflow-hidden relative">
+										<ParticipantLayout
+											users={pinnedActors.filter(isNonNullable)}
+										/>
+									</div>
+								)}
+								{unpinnedActors.length > 0 && (
+									<div
+										className={`overflow-hidden relative ${
+											pinnedActors.length > 0 ? 'flex-grow' : 'flex-grow w-full'
+										}`}
+									>
+										<ParticipantLayout
+											users={unpinnedActors.filter(isNonNullable)}
+										/>
+									</div>
+								)}
+							</>
 						)}
-						<div className="flex-grow overflow-hidden relative">
-							<ParticipantLayout users={unpinnedActors.filter(isNonNullable)} />
-						</div>
 					</div>
 					<Toast.Viewport className="absolute bottom-0 right-0" />
 				</div>
-				<div className="flex-shrink-0 flex items-center justify-center gap-1 sm:gap-4 text-sm p-2 sm:p-4 bg-white pb-[env(safe-area-inset-bottom)] h-[3rem]">
+				<div className="flex-shrink-0 flex items-center justify-center gap-2 text-sm p-0 px-2 bg-white pb-[env(safe-area-inset-bottom)] h-[3rem]">
 					{hasAiCredentials && aiInviteEnabled && (
 						<AiButton recordActivity={recordActivity} />
 					)}

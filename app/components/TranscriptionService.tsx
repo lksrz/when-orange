@@ -10,10 +10,8 @@ export type Transcription = {
 }
 
 // Configuration
-const REALTIME_API_URL = 'wss://api.openai.com/v1/realtime'
-const CHUNK_DURATION_MS = 5000 // 5 seconds for POST API chunks
-const MIN_AUDIO_LEVEL = 0.01 // Minimum RMS level to consider as speech
-const RECONNECT_DELAY_MS = 2000 // Delay before attempting reconnection
+const CHUNK_DURATION_MS = 3000 // 3 seconds for audio chunks
+const MIN_AUDIO_LEVEL = 0.001 // Lower threshold to capture more audio
 
 // Helper function to convert AudioBuffer to WAV format
 function audioBufferToWav(buffer: AudioBuffer): ArrayBuffer {
@@ -65,16 +63,6 @@ function audioBufferToWav(buffer: AudioBuffer): ArrayBuffer {
 	return arrayBuffer
 }
 
-// Convert PCM16 audio to base64 for real-time API
-function pcm16ToBase64(buffer: ArrayBuffer): string {
-	const bytes = new Uint8Array(buffer)
-	let binary = ''
-	for (let i = 0; i < bytes.byteLength; i++) {
-		binary += String.fromCharCode(bytes[i])
-	}
-	return btoa(binary)
-}
-
 // Calculate RMS (Root Mean Square) for volume detection
 function calculateRMS(audioData: Float32Array): number {
 	let sum = 0
@@ -95,130 +83,23 @@ export const TranscriptionService: React.FC<Props> = ({
 	audioTracks,
 	onTranscription,
 	isActive,
-	participants,
+	participants: _participants,
 }) => {
-	const realtimeWsRef = useRef<WebSocket | null>(null)
-	const fallbackModeRef = useRef<boolean>(false)
 	const audioContextRef = useRef<AudioContext | null>(null)
 	const processorRef = useRef<ScriptProcessorNode | null>(null)
 	const tokenRef = useRef<string>('')
-	const isConnectingRef = useRef<boolean>(false)
-	const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
-	// Generate prompt with participant names
-	const generatePrompt = useCallback(() => {
-		return `This is a transcription of an online meeting with participants: ${participants.join(', ')}. Please transcribe the conversation accurately, including speaker identification when possible.`
-	}, [participants])
-
-	// Setup real-time WebSocket connection
-	const setupRealtimeConnection = useCallback(
-		async (token: string) => {
-			if (
-				isConnectingRef.current ||
-				realtimeWsRef.current?.readyState === WebSocket.OPEN
-			) {
-				return
-			}
-
-			isConnectingRef.current = true
-
-			try {
-				console.log('Attempting to connect to OpenAI Realtime API...')
-
-				const ws = new WebSocket(
-					`${REALTIME_API_URL}?intent=transcription&authorization=${token}`
-				)
-
-				ws.addEventListener('open', () => {
-					console.log('Connected to OpenAI Realtime API')
-					isConnectingRef.current = false
-					fallbackModeRef.current = false
-
-					// Configure transcription session
-					ws.send(
-						JSON.stringify({
-							type: 'transcription_session.update',
-							input_audio_format: 'pcm16',
-							input_audio_transcription: {
-								model: 'gpt-4o-transcribe',
-								prompt: generatePrompt(),
-								language: 'en',
-							},
-							turn_detection: {
-								type: 'server_vad',
-								threshold: 0.5,
-								prefix_padding_ms: 300,
-								silence_duration_ms: 500,
-							},
-						})
-					)
-				})
-
-				ws.addEventListener('message', (event) => {
-					try {
-						const data = JSON.parse(event.data)
-
-						if (data.type === 'input_audio_transcription.completed') {
-							const transcript = data.transcript
-							if (transcript && transcript.trim()) {
-								onTranscription({
-									id: `realtime_${Date.now()}_${Math.random()}`,
-									text: transcript,
-									timestamp: Date.now(),
-									isFinal: true,
-									speaker: 'OpenAI Realtime',
-								})
-							}
-						} else if (data.type === 'error') {
-							console.error('Realtime API error:', data.error)
-							// If we get an error, switch to fallback mode
-							fallbackModeRef.current = true
-							ws.close()
-						}
-					} catch (e) {
-						console.error('Error parsing realtime message:', e)
-					}
-				})
-
-				ws.addEventListener('error', (error) => {
-					console.error('Realtime WebSocket error:', error)
-					isConnectingRef.current = false
-					fallbackModeRef.current = true
-				})
-
-				ws.addEventListener('close', () => {
-					console.log('Realtime WebSocket closed')
-					isConnectingRef.current = false
-					realtimeWsRef.current = null
-
-					// If not in fallback mode, try to reconnect
-					if (!fallbackModeRef.current) {
-						reconnectTimeoutRef.current = setTimeout(() => {
-							setupRealtimeConnection(token)
-						}, RECONNECT_DELAY_MS)
-					}
-				})
-
-				realtimeWsRef.current = ws
-			} catch (error) {
-				console.error('Failed to setup realtime connection:', error)
-				isConnectingRef.current = false
-				fallbackModeRef.current = true
-			}
-		},
-		[generatePrompt, onTranscription]
-	)
-
-	// Send audio chunk via POST API (fallback)
-	const sendAudioChunkViaPost = useCallback(
+	// Send audio chunk to Whisper API
+	const sendAudioChunkToWhisper = useCallback(
 		async (audioBlob: Blob, token: string) => {
 			try {
+				console.log(`🎤 OpenAI: Sending audio chunk (${audioBlob.size} bytes) to Whisper API`)
+				
 				const formData = new FormData()
 				formData.append('file', audioBlob, 'audio.wav')
-				formData.append('model', 'gpt-4o-transcribe')
+				formData.append('model', 'whisper-1')
 				formData.append('language', 'en')
 				formData.append('response_format', 'json')
-				formData.append('prompt', generatePrompt())
 
 				const response = await fetch(
 					'https://api.openai.com/v1/audio/transcriptions',
@@ -233,28 +114,37 @@ export const TranscriptionService: React.FC<Props> = ({
 
 				if (response.ok) {
 					const data = (await response.json()) as { text?: string }
+					console.log(`🎤 OpenAI Whisper: Received transcript: "${data.text}"`)
 					if (data.text && data.text.trim()) {
+						console.log(`🎤 OpenAI Whisper: Adding valid transcript: "${data.text}"`)
 						onTranscription({
-							id: `post_${Date.now()}_${Math.random()}`,
+							id: `whisper_${Date.now()}_${Math.random()}`,
 							text: data.text,
 							timestamp: Date.now(),
 							isFinal: true,
-							speaker: 'OpenAI',
+							speaker: 'OpenAI Whisper',
 						})
+					} else {
+						console.log(`🎤 OpenAI Whisper: Ignoring empty/whitespace transcript`)
 					}
 				} else {
-					console.error('POST transcription failed:', response.status)
+					const errorText = await response.text()
+					console.error('🎤 OpenAI Whisper: API error:', response.status, errorText)
 				}
 			} catch (error) {
-				console.error('Error sending audio chunk via POST:', error)
+				console.error('🎤 OpenAI Whisper: Request failed:', error)
 			}
 		},
-		[generatePrompt, onTranscription]
+		[onTranscription]
 	)
 
 	// Setup audio processing
 	const setupAudioProcessing = useCallback(
 		(stream: MediaStream, token: string) => {
+			console.log('🎤 OpenAI: Setting up audio processing for Whisper API')
+			console.log('🎤 OpenAI: Stream tracks:', stream.getTracks().map(t => `${t.kind}: ${t.enabled}, ${t.readyState}, muted: ${t.muted}`))
+			console.log('🎤 OpenAI: Stream active:', stream.active)
+			
 			// Clean up existing audio context
 			if (audioContextRef.current) {
 				audioContextRef.current.close()
@@ -263,6 +153,16 @@ export const TranscriptionService: React.FC<Props> = ({
 			const audioContext = new (window.AudioContext ||
 				(window as any).webkitAudioContext)()
 			audioContextRef.current = audioContext
+
+			console.log('🎤 OpenAI: Audio context state:', audioContext.state)
+			console.log('🎤 OpenAI: Audio context sample rate:', audioContext.sampleRate)
+
+			// Resume audio context if suspended
+			if (audioContext.state === 'suspended') {
+				audioContext.resume().then(() => {
+					console.log('🎤 OpenAI: Audio context resumed')
+				})
+			}
 
 			const source = audioContext.createMediaStreamSource(stream)
 			const processor = audioContext.createScriptProcessor(4096, 1, 1)
@@ -293,8 +193,15 @@ export const TranscriptionService: React.FC<Props> = ({
 
 					// Calculate RMS to check if there's actual audio
 					const rms = calculateRMS(combinedBuffer)
+					
+					// Log occasionally to debug
+					if (Math.random() < 0.1) { // 10% of the time
+						console.log(`🎤 OpenAI: Audio RMS level: ${rms.toFixed(4)}, Min threshold: ${MIN_AUDIO_LEVEL}`)
+					}
 
 					if (rms > MIN_AUDIO_LEVEL) {
+						console.log(`🎤 OpenAI: Processing audio chunk (${combinedBuffer.length} samples, RMS: ${rms.toFixed(4)})`)
+						
 						// Create audio buffer for conversion
 						const audioBufferObj = audioContext.createBuffer(
 							1,
@@ -303,27 +210,14 @@ export const TranscriptionService: React.FC<Props> = ({
 						)
 						audioBufferObj.copyToChannel(combinedBuffer, 0)
 
-						if (
-							!fallbackModeRef.current &&
-							realtimeWsRef.current?.readyState === WebSocket.OPEN
-						) {
-							// Send via real-time API
-							const wavBuffer = audioBufferToWav(audioBufferObj)
-							// Extract PCM data (skip WAV header)
-							const pcmData = new Uint8Array(wavBuffer, 44)
-							const base64Audio = pcm16ToBase64(pcmData.buffer)
-
-							realtimeWsRef.current.send(
-								JSON.stringify({
-									type: 'input_audio_buffer.append',
-									audio: base64Audio,
-								})
-							)
-						} else {
-							// Use POST API fallback
-							const wavBuffer = audioBufferToWav(audioBufferObj)
-							const audioBlob = new Blob([wavBuffer], { type: 'audio/wav' })
-							sendAudioChunkViaPost(audioBlob, token)
+						// Convert to WAV and send to Whisper API
+						const wavBuffer = audioBufferToWav(audioBufferObj)
+						const audioBlob = new Blob([wavBuffer], { type: 'audio/wav' })
+						sendAudioChunkToWhisper(audioBlob, token)
+					} else {
+						// Log when audio is too quiet
+						if (Math.random() < 0.01) { // 1% of the time
+							console.log(`🎤 OpenAI: Audio too quiet (RMS: ${rms.toFixed(4)}), skipping`)
 						}
 					}
 
@@ -336,15 +230,18 @@ export const TranscriptionService: React.FC<Props> = ({
 			source.connect(processor)
 			processor.connect(audioContext.destination)
 		},
-		[sendAudioChunkViaPost]
+		[sendAudioChunkToWhisper]
 	)
 
 	useEffect(() => {
-		if (!isActive || audioTracks.length === 0) return
+		if (!isActive || audioTracks.length === 0) {
+			console.log('🎤 OpenAI: Not starting - isActive:', isActive, 'audioTracks:', audioTracks.length)
+			return
+		}
 
-		console.log('Starting OpenAI transcription service')
+		console.log('🎤 OpenAI: Starting Whisper transcription service')
+		console.log('🎤 OpenAI: Audio tracks:', audioTracks.map(t => `${t.kind}: ${t.enabled}, ${t.readyState}`))
 
-		let mediaRecorder: MediaRecorder | null = null
 		let isCleanedUp = false
 
 		;(async () => {
@@ -356,93 +253,23 @@ export const TranscriptionService: React.FC<Props> = ({
 				}
 				const { token }: { token: string } = await resp.json()
 				tokenRef.current = token
+				console.log('🎤 OpenAI: Token obtained successfully')
 
 				if (isCleanedUp) return
 
-				// Try to establish real-time connection first
-				await setupRealtimeConnection(token)
-
-				// Setup audio processing
+				// Setup audio processing with Whisper API
 				const primaryAudioTrack = audioTracks[0]
+				console.log('🎤 OpenAI: Using audio track:', primaryAudioTrack.kind, primaryAudioTrack.enabled, primaryAudioTrack.readyState)
 				const combinedStream = new MediaStream([primaryAudioTrack])
 				setupAudioProcessing(combinedStream, token)
-
-				// Alternative: Use MediaRecorder for chunked recording (backup method)
-				if (fallbackModeRef.current) {
-					mediaRecorder = new MediaRecorder(combinedStream, {
-						mimeType: 'audio/webm;codecs=opus',
-					})
-
-					const audioChunks: Blob[] = []
-
-					mediaRecorder.ondataavailable = (event) => {
-						if (event.data.size > 0) {
-							audioChunks.push(event.data)
-						}
-					}
-
-					mediaRecorder.onstop = async () => {
-						if (audioChunks.length === 0 || isCleanedUp) return
-
-						// Process and send the recorded chunk
-						const audioBlob = new Blob(audioChunks, { type: 'audio/webm' })
-
-						// Convert WebM to WAV for OpenAI API
-						const arrayBuffer = await audioBlob.arrayBuffer()
-						const audioContext = new (window.AudioContext ||
-							(window as any).webkitAudioContext)()
-						const audioBuffer = await audioContext.decodeAudioData(arrayBuffer)
-						const wavBuffer = audioBufferToWav(audioBuffer)
-						const wavBlob = new Blob([wavBuffer], { type: 'audio/wav' })
-
-						await sendAudioChunkViaPost(wavBlob, token)
-						audioContext.close()
-					}
-
-					// Start recording in chunks
-					const recordingInterval = setInterval(() => {
-						if (mediaRecorder?.state === 'recording') {
-							mediaRecorder.stop()
-							audioChunks.length = 0
-							setTimeout(() => {
-								if (!isCleanedUp && mediaRecorder?.state === 'inactive') {
-									mediaRecorder.start()
-								}
-							}, 100)
-						}
-					}, CHUNK_DURATION_MS)
-
-					mediaRecorder.start()
-
-					return () => {
-						clearInterval(recordingInterval)
-					}
-				}
 			} catch (error) {
-				console.error('TranscriptionService error:', error)
+				console.error('🎤 OpenAI: TranscriptionService error:', error)
 			}
 		})()
 
 		// Cleanup function
 		return () => {
 			isCleanedUp = true
-
-			// Close WebSocket
-			if (realtimeWsRef.current) {
-				realtimeWsRef.current.close()
-				realtimeWsRef.current = null
-			}
-
-			// Clear reconnect timeout
-			if (reconnectTimeoutRef.current) {
-				clearTimeout(reconnectTimeoutRef.current)
-				reconnectTimeoutRef.current = null
-			}
-
-			// Stop MediaRecorder
-			if (mediaRecorder && mediaRecorder.state !== 'inactive') {
-				mediaRecorder.stop()
-			}
 
 			// Close audio context
 			if (audioContextRef.current) {
@@ -459,10 +286,7 @@ export const TranscriptionService: React.FC<Props> = ({
 	}, [
 		isActive,
 		audioTracks,
-		participants,
-		setupRealtimeConnection,
 		setupAudioProcessing,
-		sendAudioChunkViaPost,
 	])
 
 	return null // No UI, just a service
