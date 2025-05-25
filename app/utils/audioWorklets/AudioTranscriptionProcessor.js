@@ -28,6 +28,11 @@ class AudioTranscriptionProcessor extends AudioWorkletProcessor {
 		}
 
 		// Send the processed data to the main thread
+		// Debug: log before posting audio buffer
+		console.log('[AudioWorklet] Posting audio buffer to main thread', {
+			sampleLength: samples.length,
+			type: typeof samples[0]
+		});
 		this.port.postMessage(
 			{
 				type: 'audio-data',

@@ -1,6 +1,15 @@
-import '@mediapipe/selfie_segmentation'
-import * as bodySegmentation from '@tensorflow-models/body-segmentation'
-import '@tensorflow/tfjs-backend-webgl'
+// Direct static imports to ensure the modules are included in the bundle
+import '@tensorflow/tfjs-backend-webgl';
+import * as bodySegmentation from '@tensorflow-models/body-segmentation';
+
+// Use a direct import to ensure the package is bundled despite sideEffects:[] in package.json
+// This import is specifically needed for the selfie segmentation to work properly
+import '@mediapipe/selfie_segmentation';
+
+// We need to add this line to trick the bundler into keeping the import
+// This creates a side effect that ensures the module is included
+// @ts-ignore - Deliberately accessing a property to create side effect
+const _ensureMediaPipeIncluded = typeof window !== 'undefined' ? window['__mediapipeSelfieSegmentationLoaded'] = true : null;
 
 export default async function blurVideoTrack(
 	originalVideoStreamTrack: MediaStreamTrack

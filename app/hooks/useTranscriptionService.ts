@@ -91,13 +91,15 @@ export default function useTranscriptionService(
 	 */
 	const setupAudioProcessing = useCallback(
 		(track: MediaStreamTrack) => {
+			console.log('Transcription service: setupAudioProcessing called', { track, wsReady: wsRef.current?.readyState })
 			if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-				// No connection, can't process audio
+				console.warn('Transcription service: setupAudioProcessing early exit - WebSocket not open', { ws: wsRef.current })
 				return
 			}
 
 			// Already processing this track
 			if (audioTrackRef.current === track) {
+				console.log('Transcription service: setupAudioProcessing - already processing this track')
 				return
 			}
 
@@ -106,7 +108,7 @@ export default function useTranscriptionService(
 
 			// Validate track state
 			if (track.readyState !== 'live') {
-				console.error('Transcription service: Track is not active')
+				console.error('Transcription service: Track is not active', { track })
 				options.onError?.(new Error('Audio track is not active'))
 				return
 			}
@@ -120,6 +122,7 @@ export default function useTranscriptionService(
 				)
 			}
 
+			console.log('Transcription service: setupAudioProcessing - track is valid, proceeding')
 			// Store the track reference
 			audioTrackRef.current = track
 
@@ -130,54 +133,81 @@ export default function useTranscriptionService(
 					new MediaStream([track])
 				)
 
-				// Check if AudioWorklet is supported
 				if ('audioWorklet' in audioContext) {
-					// Log that we'll be using ScriptProcessorNode as a fallback
-					console.warn(
-						'Transcription service: AudioWorklet is supported but not yet implemented. ' +
-							'Using deprecated ScriptProcessorNode as fallback. ' +
-							'This will be updated in a future release.'
-					)
-				} else {
-					console.warn(
-						'Transcription service: Using deprecated ScriptProcessorNode for audio processing. ' +
-							'This browser does not support AudioWorklet, which is the recommended replacement.'
-					)
-				}
+					console.log('Transcription service: AudioWorklet supported, attempting to load module /utils/audioWorklets/AudioTranscriptionProcessor.js')
+					async function setupWorklet() {
+						try {
+							console.log('Transcription service: Before addModule')
+							await audioContext.audioWorklet.addModule('/utils/audioWorklets/AudioTranscriptionProcessor.js')
+							console.log('Transcription service: After addModule, before node creation')
+							const workletNode = new AudioWorkletNode(audioContext, 'audio-transcription-processor')
+							console.log('Transcription service: AudioWorkletNode created and module loaded.')
 
-				// Create a ScriptProcessorNode to process audio data
-				// DEPRECATED: ScriptProcessorNode will be removed in future versions of the Web Audio API
-				const processor = audioContext.createScriptProcessor(2048, 1, 1) // Using smaller buffer size (2048) for lower latency
+							// Listen for messages from the worklet
+							workletNode.port.onmessage = (event) => {
+								const { data } = event
+								console.log('Transcription service: Received audio buffer from AudioWorkletNode', data)
+								if (wsRef.current?.readyState === WebSocket.OPEN) {
+									try {
+										console.log('Transcription service: Debug outgoing buffer', { length: data.byteLength, sample: Array.from(new Uint8Array(data)).slice(0, 10) });
+wsRef.current.send(data)
+console.log('Transcription service: Sent audio buffer to backend.')
+									} catch (err) {
+										console.error('Transcription service: Error sending audio buffer to backend', err)
+									}
+								}
+							}
 
-				// Process audio data and send to the WebSocket
-				processor.onaudioprocess = (event) => {
-					if (wsRef.current?.readyState === WebSocket.OPEN) {
-						const pcmData = event.inputBuffer.getChannelData(0)
+							// Connect the audio nodes
+							source.connect(workletNode)
+							// Optionally connect to destination for monitoring
+							// workletNode.connect(audioContext.destination);
 
-						// Convert Float32Array to Int16Array for Deepgram
-						// Using optimized single-pass method instead of nested loops
-						const samples = new Int16Array(pcmData.length)
-						for (let i = 0; i < pcmData.length; i++) {
-							// Clamp values to [-1, 1] range
-							const s = Math.max(-1, Math.min(1, pcmData[i]))
-							// Convert to 16-bit integer range
-							samples[i] =
-								s < 0 ? Math.floor(s * 0x8000) : Math.floor(s * 0x7fff)
+							// Store references
+							audioContextRef.current = audioContext
+							sourceRef.current = source
+							processorRef.current = null // Not using ScriptProcessorNode
+							console.log('Transcription service: AudioWorkletNode wired up and ready.')
+						} catch (err) {
+							console.error('Transcription service: Failed to initialize AudioWorkletNode. Falling back to ScriptProcessorNode.', err)
+							fallbackToScriptProcessor()
 						}
-
-						// Send the audio data to the server
-						wsRef.current.send(samples.buffer)
 					}
+					setupWorklet();
+				} else {
+					console.warn('Transcription service: AudioWorklet NOT supported, will use ScriptProcessorNode.')
+					fallbackToScriptProcessor()
 				}
 
-				// Connect the nodes
-				source.connect(processor)
-				processor.connect(audioContext.destination)
-
-				// Store references
-				audioContextRef.current = audioContext
-				sourceRef.current = source
-				processorRef.current = processor
+				function fallbackToScriptProcessor() {
+					console.warn(
+						'Transcription service: Using deprecated ScriptProcessorNode for audio processing.'
+					)
+					// Create a ScriptProcessorNode to process audio data
+					const processor = audioContext.createScriptProcessor(2048, 1, 1) // Lower latency
+					processor.onaudioprocess = (event) => {
+						if (wsRef.current?.readyState === WebSocket.OPEN) {
+							const pcmData = event.inputBuffer.getChannelData(0)
+							const samples = new Int16Array(pcmData.length)
+							for (let i = 0; i < pcmData.length; i++) {
+								const s = Math.max(-1, Math.min(1, pcmData[i]))
+								samples[i] = s < 0 ? Math.floor(s * 0x8000) : Math.floor(s * 0x7fff)
+							}
+							try {
+								wsRef.current.send(samples.buffer)
+								console.log('Transcription service: Sent audio buffer to backend (ScriptProcessorNode).')
+							} catch (err) {
+								console.error('Transcription service: Error sending audio buffer to backend (ScriptProcessorNode)', err)
+							}
+						}
+					}
+					source.connect(processor)
+					processor.connect(audioContext.destination)
+					audioContextRef.current = audioContext
+					sourceRef.current = source
+					processorRef.current = processor
+					console.log('Transcription service: ScriptProcessorNode wired up and ready.')
+				}
 			} catch (error) {
 				console.error(
 					'Transcription service: Failed to set up audio processing',
@@ -689,6 +719,13 @@ export default function useTranscriptionService(
 	// Start transcription for a given audio track
 	const startTranscription = useCallback(
 		(track: MediaStreamTrack) => {
+			console.log('Transcription service: startTranscription called', { track });
+			if (!track) {
+				console.warn('Transcription service: startTranscription called with no track');
+			}
+			if (track && track.readyState !== 'live') {
+				console.warn('Transcription service: startTranscription called with inactive track', { track });
+			}
 			// Set up WebSocket if not already done
 			if (!wsRef.current) {
 				setupWebSocket()

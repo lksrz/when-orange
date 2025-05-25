@@ -88,10 +88,14 @@ export const TranscriptionService: React.FC<Props> = ({
 	const audioContextRef = useRef<AudioContext | null>(null)
 	const processorRef = useRef<ScriptProcessorNode | null>(null)
 	const tokenRef = useRef<string>('')
+	const activeTrackIdsRef = useRef<string[]>([])
 
 	// Send audio chunk to Whisper API
 	const sendAudioChunkToWhisper = useCallback(
 		async (audioBlob: Blob, token: string) => {
+			console.log(
+				`[TranscriptionService] Preparing to send audio chunk (${audioBlob.size} bytes)`
+			)
 			try {
 				console.log(
 					`🎤 OpenAI: Sending audio chunk (${audioBlob.size} bytes) to Whisper API`
@@ -163,8 +167,11 @@ export const TranscriptionService: React.FC<Props> = ({
 			console.log('🎤 OpenAI: Stream active:', stream.active)
 
 			// Clean up existing audio context
-			if (audioContextRef.current) {
-				audioContextRef.current.close()
+			if (
+				audioContextRef.current &&
+				audioContextRef.current.state !== 'closed'
+			) {
+				audioContextRef.current.close().catch(console.error)
 			}
 
 			const audioContext = new (window.AudioContext ||
@@ -241,11 +248,12 @@ export const TranscriptionService: React.FC<Props> = ({
 						sendAudioChunkToWhisper(audioBlob, token)
 					} else {
 						// Log when audio is too quiet
-						if (Math.random() < 0.01) {
-							// 1% of the time
-							console.log(
-								`🎤 OpenAI: Audio too quiet (RMS: ${rms.toFixed(4)}), skipping`
-							)
+						console.log(
+							`[TranscriptionService] Audio too quiet (RMS: ${rms.toFixed(4)}), skipping`
+						)
+						consecutiveSilentBuffers++
+						if (consecutiveSilentBuffers > 10) {
+							console.warn('[TranscriptionService] WARNING: More than 10 consecutive silent audio buffers. Is your mic muted or disconnected?')
 						}
 					}
 
@@ -262,23 +270,53 @@ export const TranscriptionService: React.FC<Props> = ({
 	)
 
 	useEffect(() => {
+		const currentTrackIds = audioTracks
+			.map((t) => t.id)
+			.sort()
+			.join(',')
+		const previousTrackIds = activeTrackIdsRef.current.sort().join(',')
+
 		if (!isActive || audioTracks.length === 0) {
 			console.log(
-				'🎤 OpenAI: Not starting - isActive:',
+				'[TranscriptionService] Not starting - isActive:',
 				isActive,
 				'audioTracks:',
 				audioTracks.length
 			)
+			// Cleanup if service was active and is now stopping
+			if (
+				activeTrackIdsRef.current.length > 0 &&
+				(!isActive || audioTracks.length === 0)
+			) {
+				if (
+					audioContextRef.current &&
+					audioContextRef.current.state !== 'closed'
+				) {
+					audioContextRef.current.close().catch(console.error)
+					audioContextRef.current = null
+				}
+				if (processorRef.current) {
+					processorRef.current.disconnect()
+					processorRef.current = null
+				}
+				activeTrackIdsRef.current = []
+			}
 			return
 		}
 
-		console.log('🎤 OpenAI: Starting Whisper transcription service')
+		// Always restart the pipeline on any change
+		console.log('[TranscriptionService] Forcing pipeline restart (wasActive:', activeTrackIdsRef.current.length > 0, ', isActive:', isActive, ', currentTrackIds:', currentTrackIds, ', previousTrackIds:', previousTrackIds, ')')
+
+		console.log('[TranscriptionService] Starting Whisper transcription service')
 		console.log(
-			'🎤 OpenAI: Audio tracks:',
+			'[TranscriptionService] Audio tracks:',
 			audioTracks.map((t) => `${t.kind}: ${t.enabled}, ${t.readyState}`)
 		)
 
 		let isCleanedUp = false
+
+		// Reset silent buffer counter
+		consecutiveSilentBuffers = 0;
 
 		;(async () => {
 			try {
@@ -314,13 +352,18 @@ export const TranscriptionService: React.FC<Props> = ({
 			}
 		})()
 
+		activeTrackIdsRef.current = audioTracks.map((t) => t.id) // Update active track IDs
+
 		// Cleanup function
 		return () => {
 			isCleanedUp = true
 
 			// Close audio context
-			if (audioContextRef.current) {
-				audioContextRef.current.close()
+			if (
+				audioContextRef.current &&
+				audioContextRef.current.state !== 'closed'
+			) {
+				audioContextRef.current.close().catch(console.error)
 				audioContextRef.current = null
 			}
 
@@ -330,7 +373,12 @@ export const TranscriptionService: React.FC<Props> = ({
 				processorRef.current = null
 			}
 		}
-	}, [isActive, audioTracks, setupAudioProcessing])
+	}, [isActive, audioTracks, setupAudioProcessing, onTranscription])
 
 	return null // No UI, just a service
 }
+
+// --- Robust Diagnosis Patch ---
+// Add a module-level counter for consecutive silent buffers
+let consecutiveSilentBuffers = 0;
+

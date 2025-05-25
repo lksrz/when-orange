@@ -1,5 +1,6 @@
 {
 	"name": "@cloudflare/orange-meets",
+	"sideEffects": ["app/utils/blurVideoTrack.ts"],
 	"scripts": {
 		"build": "remix build",
 		"build:e2ee-worker": "./rust-mls-worker/build.sh",

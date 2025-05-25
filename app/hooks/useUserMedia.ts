@@ -24,6 +24,7 @@ export const errorMessageMap = {
 type UserMediaError = keyof typeof errorMessageMap
 
 export default function useUserMedia() {
+	console.log('useUserMedia hook initialized');
 	const [blurVideo, setBlurVideo] = useLocalStorage('blur-video', false)
 	const [suppressNoise, setSuppressNoise] = useLocalStorage(
 		'suppress-noise',

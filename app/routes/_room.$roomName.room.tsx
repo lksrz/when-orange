@@ -6,7 +6,7 @@ import {
 	useParams,
 	useSearchParams,
 } from '@remix-run/react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useMount, useWindowSize } from 'react-use'
 import invariant from 'tiny-invariant'
 import { AiButton } from '~/components/AiButton'
@@ -27,7 +27,8 @@ import { RaiseHandButton } from '~/components/RaiseHandButton'
 import { ScreenshareButton } from '~/components/ScreenshareButton'
 import Toast from '~/components/Toast'
 import { TranscriptionPanel } from '~/components/TranscriptionPanel'
-import { TranscriptionService } from '~/components/TranscriptionService'
+import { TranscriptionServiceWrapper } from '~/components/TranscriptionServiceWrapper'
+import { getTranscriptionProvider } from '~/config/featureFlags'
 import useBroadcastStatus from '~/hooks/useBroadcastStatus'
 import useIsSpeaking from '~/hooks/useIsSpeaking'
 import { useMobileViewportHeight } from '~/hooks/useMobileViewportHeight'
@@ -64,7 +65,7 @@ export const loader = async ({ request, context }: LoaderFunctionArgs) => {
 				context.env.FEEDBACK_STORAGE
 		),
 		mode: context.mode,
-		hasDb: Boolean(context.env.DB),
+		_hasDb: Boolean(context.env.DB), // Prefixed with _ to indicate unused variable
 		hasAiCredentials: Boolean(
 			context.env.OPENAI_API_TOKEN && context.env.OPENAI_MODEL_ENDPOINT
 		),
@@ -107,7 +108,6 @@ function JoinedRoom({
 	roomName: string
 }) {
 	const {
-		hasDb,
 		hasAiCredentials,
 		transcriptionProvider,
 		hasOpenAiTranscription,
@@ -146,8 +146,7 @@ function JoinedRoom({
 
 	// Initialize E2EE after peer connection is established
 	useEffect(() => {
-		if (e2eeEnabled && identity) {
-			// Use a more reliable method to determine if this is the first user
+		if (e2eeEnabled && identity?.id && e2eeOnJoin) {
 			// We'll start as a joining user and let the E2EE system handle group creation if needed
 			const isFirstUser = false // Always start as joining user, E2EE will create group if none exists
 			console.log(
@@ -158,7 +157,7 @@ function JoinedRoom({
 			)
 			e2eeOnJoin(isFirstUser)
 		}
-	}, [e2eeEnabled, identity?.id, e2eeOnJoin]) // Only call once when identity is established
+	}, [e2eeEnabled, identity, identity?.id, e2eeOnJoin]) // Only call once when identity is established
 
 	useBroadcastStatus({
 		userMedia,
@@ -191,11 +190,16 @@ function JoinedRoom({
 		identity
 	)
 
+	// Removing unused variable to fix lint warning
+	// const allUsersArray = [...otherUsers, { id: identity?.id }].filter((u) => u.id)
+
 	useEffect(() => {
+		if (!identity) return
+		// Record users in room for activity tracking
 		otherUsers.forEach((u) => {
 			if (u.speaking || u.raisedHand) recordActivity(u)
 		})
-	}, [otherUsers, recordActivity])
+	}, [otherUsers, recordActivity, identity])
 
 	// Find screen sharing actors first - they should always be prioritized
 	// Screen share actors have IDs ending with the screenshareSuffix
@@ -252,19 +256,40 @@ function JoinedRoom({
 	const [transcriptions, setTranscriptions] = useState<Transcription[]>([])
 
 	const isTranscriptionHost = useMemo(() => {
-		// Use the first joined user as the transcription host
-		// If you're alone in the room, you're the host
-		// If there are others, check if you're the first in the sorted list
-		if (otherUsers.length === 0) {
-			return true // You're alone, so you're the host
+		// Only proceed if we have our own identity
+		if (!identity?.id) {
+			return false
 		}
 
-		// Create a list of all users (including yourself) and sort by ID for consistency
-		const allUsers = [...otherUsers, { id: identity?.id }].filter((u) => u.id)
-		allUsers.sort((a, b) => (a.id || '').localeCompare(b.id || ''))
+		// If you're alone in the room, you're the host
+		if (otherUsers.length === 0) {
+			return true
+		}
 
-		return allUsers[0]?.id === identity?.id
-	}, [otherUsers, identity])
+		// Create a list of all users (including yourself) with valid IDs
+		const allUsers = [
+			{ id: identity.id, name: identity.name },
+			...otherUsers.filter(u => u.id) // Only include users with valid IDs
+		]
+		
+		// Sort by ID consistently (lexicographic) to ensure same order on all clients
+		allUsers.sort((a, b) => a.id.localeCompare(b.id))
+		
+		// First user in sorted list is the transcription host
+		const hostId = allUsers[0]?.id
+		const isHost = hostId === identity.id
+		
+		// Debug logging to track host selection
+		console.log('🎤 Transcription Host Selection:', {
+			myId: identity.id,
+			allUserIds: allUsers.map(u => u.id),
+			sortedUserIds: allUsers.map(u => u.id),
+			selectedHostId: hostId,
+			amIHost: isHost
+		})
+		
+		return isHost
+	}, [otherUsers, identity?.id, identity?.name])
 
 	const allRemoteAudioTrackIds = useMemo(() => {
 		return otherUsers
@@ -291,6 +316,22 @@ function JoinedRoom({
 	}, [allRemoteAudioTrackIds, pulledAudioTracks, userMedia.audioStreamTrack])
 
 	const [showTranscription, setShowTranscription] = useState(false)
+	
+	// Track the current transcription host and clear transcriptions when it changes
+	const prevHostId = useRef<string | null>(null)
+	
+	useEffect(() => {
+		// Determine the current host ID
+		const currentHostId = isTranscriptionHost ? identity?.id || null : null
+		
+		// If the host changed, clear transcriptions to start fresh
+		if (prevHostId.current && prevHostId.current !== currentHostId) {
+			console.log('🎤 Transcription host changed from', prevHostId.current, 'to', currentHostId, '- clearing transcriptions')
+			setTranscriptions([])
+		}
+		
+		prevHostId.current = currentHostId
+	}, [isTranscriptionHost, identity?.id])
 
 	const participantNames = useMemo(
 		() =>
@@ -391,16 +432,17 @@ function JoinedRoom({
 			<IceDisconnectedToast />
 			<ConnectionDiagnostics />
 			{isTranscriptionHost &&
-				transcriptionEnabled &&
-				transcriptionProvider === 'openai' &&
-				hasOpenAiTranscription && (
-					<TranscriptionService
-						audioTracks={actualAudioTracks}
-						isActive={isTranscriptionHost}
-						participants={participantNames}
-						onTranscription={(t) => setTranscriptions((prev) => [...prev, t])}
-					/>
-				)}
+			transcriptionEnabled &&
+			(transcriptionProvider === 'openai' || transcriptionProvider === 'openai-realtime') &&
+			hasOpenAiTranscription && (
+				<TranscriptionServiceWrapper
+					audioTracks={actualAudioTracks}
+					isActive={isTranscriptionHost}
+					participants={participantNames}
+					onTranscription={(t) => setTranscriptions((prev) => [...prev, t])}
+					provider={getTranscriptionProvider()}
+				/>
+			)}
 			{transcriptionEnabled && (
 				<div className="fixed top-4 right-4 z-50 bg-white border border-gray-300 rounded-lg p-4 shadow-lg">
 					<button
@@ -422,7 +464,19 @@ function JoinedRoom({
 			)}
 			{transcriptionEnabled && showTranscription && (
 				<div className="fixed top-20 right-4 z-40 w-80 h-96 bg-white border border-gray-300 rounded-lg shadow-lg">
-					<TranscriptionPanel transcriptions={transcriptions} />
+					<TranscriptionPanel 
+						transcriptions={transcriptions} 
+						isHost={isTranscriptionHost}
+						hostName={(() => {
+							// Find the current host's name
+							if (isTranscriptionHost) return undefined // Don't show host name if you are the host
+							const allUsersWithSelf = [
+								{ id: identity?.id || '', name: identity?.name || '' },
+								...otherUsers.filter(u => u.id)
+							].sort((a, b) => a.id.localeCompare(b.id))
+							return allUsersWithSelf[0]?.name
+						})()}
+					/>
 				</div>
 			)}
 		</PullAudioTracks>

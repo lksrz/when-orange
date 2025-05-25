@@ -160,21 +160,15 @@ export class TranscriptionService {
 
 				this.lastActivityTimestamp = Date.now()
 
-				// Handle requests based on Content-Type and URL pattern
-				const contentType = request.headers.get('Content-Type') || ''
-				
+				// Get audio data from request
 				if (url.pathname.endsWith('/data')) {
 					// Extract audio data from request body
 					const audioData = await request.arrayBuffer()
 					return await this.handleAudioData(audioData)
-				} else if (url.pathname.endsWith('/message')) {
-					return await this.handleMessage(request, token)
-				} else if (contentType.includes('application/octet-stream')) {
-					// Handle binary audio data sent to base URL
-					const audioData = await request.arrayBuffer()
-					return await this.handleAudioData(audioData)
-				} else if (contentType.includes('application/json')) {
-					// Handle JSON messages sent to base URL  
+				}
+
+				// Get messages from request
+				if (url.pathname.endsWith('/message')) {
 					return await this.handleMessage(request, token)
 				}
 			} else if (request.method === 'DELETE') {
@@ -285,12 +279,12 @@ export class TranscriptionService {
 	}
 
 	// Handle WebSocket message from client
-	async handleMessage(request: Request, _token: string): Promise<Response> {
+	async handleMessage(request: Request, token: string): Promise<Response> {
 		const requestId = crypto.randomUUID()
 
 		try {
 			// Get message from body
-			const data = await request.json() as ClientMessage
+			const data = await request.json()
 
 			// Check for pending messages to return
 			const pendingMessages: any[] = []
@@ -373,7 +367,7 @@ export class TranscriptionService {
 	}
 
 	// Handle connection cleanup
-	async handleCleanup(_request: Request): Promise<Response> {
+	async handleCleanup(request: Request): Promise<Response> {
 		// Clean up Deepgram connection
 		this.cleanupDeepgramConnection()
 
@@ -792,7 +786,7 @@ export class TranscriptionService {
 	}
 
 	// Handle OpenAI Realtime API token requests
-	async handleRealtimeTokenRequest(_request: Request, requestId: string): Promise<Response> {
+	async handleRealtimeTokenRequest(request: Request, requestId: string): Promise<Response> {
 		// Check if OpenAI API key is configured
 		if (!this.env.OPENAI_API_TOKEN) {
 			console.error(
@@ -803,99 +797,6 @@ export class TranscriptionService {
 					error: 'Transcription service misconfigured: Missing API key',
 					requestId,
 				}),
-				{
-					status: 500,
-					headers: {
-						'Content-Type': 'application/json',
-						'X-Request-ID': requestId,
-					},
-				}
-			)
-		}
-
-		// Skip token validation for testing
-		console.log(`TranscriptionService: Processing realtime token request [${requestId}]`)
-
-		try {
-			// Request the ephemeral token from OpenAI
-			console.log(`TranscriptionService: Requesting realtime token [${requestId}]`)
-			const response = await fetch('https://api.openai.com/v1/realtime/sessions', {
-				method: 'POST',
-				headers: {
-					'Authorization': `Bearer ${this.env.OPENAI_API_TOKEN}`,
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify({
-					model: 'gpt-4o-realtime-preview-2024-12-17',
-					voice: 'verse',
-				}),
-			})
-
-			// Check for errors from OpenAI
-			if (!response.ok) {
-				const errorData = await response.json()
-				console.error(
-					`TranscriptionService: Failed to get realtime token [${requestId}]`,
-					errorData
-				)
-				return new Response(
-					JSON.stringify({
-						error: 'Failed to obtain transcription token',
-						details: errorData,
-						requestId,
-					}),
-					{
-						status: response.status,
-						headers: {
-							'Content-Type': 'application/json',
-							'X-Request-ID': requestId,
-						},
-					}
-				)
-			}
-
-			// Forward the successful response from OpenAI with format our client expects
-			// Define the expected response type to handle the OpenAI API response
-			interface OpenAIRealtimeResponse {
-				client_secret?: { value: string } | string;
-				[key: string]: unknown;
-			}
-
-			const data = await response.json() as OpenAIRealtimeResponse
-			console.log(`TranscriptionService: Realtime token obtained successfully [${requestId}]`)
-			
-			// The API response structure can vary, so handle different possible formats
-			let tokenValue = ''
-			if (data.client_secret) {
-				if (typeof data.client_secret === 'object' && 'value' in data.client_secret) {
-					tokenValue = data.client_secret.value
-				} else if (typeof data.client_secret === 'string') {
-					tokenValue = data.client_secret
-				}
-			}
-			
-			// Create a simpler response format that matches what our client expects
-			const clientResponse = {
-				token: tokenValue,
-				expiresAt: Date.now() + 3600 * 1000, // 1 hour from now
-				provider: 'openai-realtime',
-				timestamp: Date.now(),
-				requestId
-			}
-			
-			return new Response(JSON.stringify(clientResponse), {
-				headers: {
-					'Content-Type': 'application/json',
-					'X-Request-ID': requestId,
-				},
-			})
-		} catch (error) {
-			console.error(
-				`TranscriptionService: Error generating realtime token [${requestId}]`,
-				error
-			)
-			return new Response(
-				JSON.stringify({
 					error: 'Internal server error',
 					details: error instanceof Error ? error.message : 'Unknown error',
 					requestId,

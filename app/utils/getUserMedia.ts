@@ -19,6 +19,7 @@ interface MediaStreamConstraintsWithLabels {
 export async function getUserMediaExtended(
 	constraints?: MediaStreamConstraintsWithLabels
 ) {
+	console.log('getUserMediaExtended called', { constraints });
 	const devices = await navigator.mediaDevices.enumerateDevices()
 
 	if (devices.filter((d) => d.label !== '').length === 0) {
@@ -62,5 +63,7 @@ export async function getUserMediaExtended(
 		newContsraints.video = video
 	}
 
-	return navigator.mediaDevices.getUserMedia(newContsraints)
+	const stream = await navigator.mediaDevices.getUserMedia(newContsraints);
+	console.log('getUserMediaExtended obtained stream', { stream, tracks: stream.getTracks() });
+	return stream;
 }

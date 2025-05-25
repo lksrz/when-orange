@@ -1,0 +1,101 @@
+// Handle OpenAI Realtime API token requests
+async handleRealtimeTokenRequest(request: Request, requestId: string): Promise<Response> {
+	// Check if OpenAI API key is configured
+	if (!this.env.OPENAI_API_TOKEN) {
+		console.error(
+			`TranscriptionService: OPENAI_API_TOKEN not configured [${requestId}]`
+		)
+		return new Response(
+			JSON.stringify({
+				error: 'Transcription service misconfigured: Missing API key',
+				requestId,
+			}),
+			{
+				status: 500,
+				headers: {
+					'Content-Type': 'application/json',
+					'X-Request-ID': requestId,
+				},
+			}
+		)
+	}
+
+	// Skip token validation for testing
+	console.log(`TranscriptionService: Processing realtime token request [${requestId}]`)
+
+	try {
+		// Request the ephemeral token from OpenAI
+		console.log(`TranscriptionService: Requesting realtime token [${requestId}]`)
+		const response = await fetch('https://api.openai.com/v1/realtime/sessions', {
+			method: 'POST',
+			headers: {
+				'Authorization': `Bearer ${this.env.OPENAI_API_TOKEN}`,
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				model: 'gpt-4o-realtime-preview-2024-12-17',
+				voice: 'verse',
+			}),
+		})
+
+		// Check for errors from OpenAI
+		if (!response.ok) {
+			const errorData = await response.json()
+			console.error(
+				`TranscriptionService: Failed to get realtime token [${requestId}]`,
+				errorData
+			)
+			return new Response(
+				JSON.stringify({
+					error: 'Failed to obtain transcription token',
+					details: errorData,
+					requestId,
+				}),
+				{
+					status: response.status,
+					headers: {
+						'Content-Type': 'application/json',
+						'X-Request-ID': requestId,
+					},
+				}
+			)
+		}
+
+		// Forward the successful response from OpenAI with format our client expects
+		const data = await response.json()
+		console.log(`TranscriptionService: Realtime token obtained successfully [${requestId}]`)
+		
+		// Create a simpler response format that matches what our client expects
+		const clientResponse = {
+			token: data.client_secret?.value || data.client_secret || '',
+			expiresAt: Date.now() + 3600 * 1000, // 1 hour from now
+			provider: 'openai-realtime'
+		}
+		
+		return new Response(JSON.stringify(clientResponse), {
+			headers: {
+				'Content-Type': 'application/json',
+				'X-Request-ID': requestId,
+			},
+		})
+	} catch (error) {
+		console.error(
+			`TranscriptionService: Error generating realtime token [${requestId}]`,
+			error
+		)
+		return new Response(
+			JSON.stringify({
+				error: 'Internal server error',
+				details: error instanceof Error ? error.message : 'Unknown error',
+				requestId,
+			}),
+			{
+				status: 500,
+				headers: {
+					'Content-Type': 'application/json',
+					'X-Request-ID': requestId,
+				},
+			}
+		)
+	}
+}
