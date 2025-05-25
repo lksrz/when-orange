@@ -257,11 +257,25 @@ export const TranscriptionService: React.FC<Props> = ({
 
 				if (isCleanedUp) return
 
-				// Setup audio processing with Whisper API
-				const primaryAudioTrack = audioTracks[0]
-				console.log('🎤 OpenAI: Using audio track:', primaryAudioTrack.kind, primaryAudioTrack.enabled, primaryAudioTrack.readyState)
-				const combinedStream = new MediaStream([primaryAudioTrack])
-				setupAudioProcessing(combinedStream, token)
+                               // Setup audio processing with Whisper API
+                               // Combine all available audio tracks so we can
+                               // capture remote participants as well as the
+                               // local microphone. If the browser does not
+                               // support mixing multiple tracks, it will fall
+                               // back to the first track.
+                               const validTracks = audioTracks.filter(
+                                       (t) => t && t.readyState === 'live'
+                               )
+                               const trackInfo = validTracks.map(
+                                       (t) => `${t.id}:${t.kind}:${t.readyState}`
+                               )
+                               console.log(
+                                       '🎤 OpenAI: Using audio tracks:',
+                                       trackInfo
+                               )
+
+                               const combinedStream = new MediaStream(validTracks)
+                               setupAudioProcessing(combinedStream, token)
 			} catch (error) {
 				console.error('🎤 OpenAI: TranscriptionService error:', error)
 			}
