@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 interface RealtimeTranscriptionOptions {
   enabled: boolean
   transcriptionProvider?: string
-  onTranscriptionWithSpeaker?: (text: string, speakerId?: string, speakerName?: string) => void
+  onTranscriptionWithSpeaker?: (text: string, startTime?: number, endTime?: number) => void
 }
 
 /**
@@ -55,7 +55,7 @@ export function useRealtimeTranscriptionService(
   // Get ephemeral token from our backend
   const getEphemeralToken = useCallback(async () => {
     try {
-      console.log('🎤 OpenAI Realtime: Requesting ephemeral token')
+      // console.log('🎤 OpenAI Realtime: Requesting ephemeral token')
       setIsLoading(true)
       const response = await fetch('/api/transcription-token/realtime', {
         method: 'POST',
@@ -94,7 +94,6 @@ export function useRealtimeTranscriptionService(
       
       // Add audio tracks
       tracks.forEach(track => {
-        console.log('🎤 OpenAI Realtime: Adding track to peer connection', track.kind, track.enabled)
         pc.addTrack(track)
       })
       
@@ -113,7 +112,6 @@ export function useRealtimeTranscriptionService(
             const itemId = data.item_id
             if (itemId) {
               ongoingTranscriptions.current.set(itemId, { startTime: now })
-              console.log('🎤 OpenAI Realtime: Speech started for item:', itemId)
             }
           }
           
@@ -128,20 +126,15 @@ export function useRealtimeTranscriptionService(
               const startTime = timingInfo?.startTime || (now - 2000) // Default to 2 seconds ago if no start time
               const endTime = now
               
-              console.log('🎤 OpenAI Realtime: Received transcript:', {
-                text,
-                itemId,
-                startTime,
-                endTime,
-                duration: endTime - startTime
-              })
+              // Track successful transcription for debugging if needed
+              // console.log('🎤 OpenAI Realtime: Received transcript:', text)
               
               // Add to local state
               setTranscripts(prev => [...prev, text])
               
               // Call the speaker-aware callback if provided
               if (onTranscriptionWithSpeaker) {
-                onTranscriptionWithSpeaker(text, undefined, undefined) // Will be filled by parent component
+                onTranscriptionWithSpeaker(text, startTime, endTime)
               }
               
               // Clean up timing info

@@ -61,6 +61,16 @@ export type ServerMessage =
 			type: 'e2eeMlsMessage'
 			payload: any
 	  }
+	| {
+			type: 'transcription'
+			transcription: {
+				id: string
+				text: string
+				timestamp: number
+				speaker: string
+				userId?: string
+			}
+	  }
 
 export type ClientMessage =
 	| {
@@ -107,4 +117,14 @@ export type ClientMessage =
 	| {
 			type: 'e2eeMlsMessage'
 			payload: any
+	  }
+	| {
+			type: 'sendTranscription'
+			transcription: {
+				id: string
+				text: string
+				timestamp: number
+				speaker: string
+				userId?: string
+			}
 	  }

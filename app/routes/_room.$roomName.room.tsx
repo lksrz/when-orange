@@ -6,7 +6,7 @@ import {
 	useParams,
 	useSearchParams,
 } from '@remix-run/react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useMount, useWindowSize } from 'react-use'
 import invariant from 'tiny-invariant'
 import { AiButton } from '~/components/AiButton'
@@ -28,8 +28,10 @@ import { ScreenshareButton } from '~/components/ScreenshareButton'
 import Toast from '~/components/Toast'
 import { TranscriptionPanel } from '~/components/TranscriptionPanel'
 import { TranscriptionServiceWrapper } from '~/components/TranscriptionServiceWrapper'
+import { SubtitleOverlay } from '~/components/SubtitleOverlay'
 import { getTranscriptionProvider } from '~/config/featureFlags'
 import { useSpeakerTracker } from '~/hooks/useSpeakerTracker'
+import { UserSpeakingDetector } from '~/hooks/useMultiUserSpeakingDetection'
 import useBroadcastStatus from '~/hooks/useBroadcastStatus'
 import useIsSpeaking from '~/hooks/useIsSpeaking'
 import { useMobileViewportHeight } from '~/hooks/useMobileViewportHeight'
@@ -252,60 +254,86 @@ function JoinedRoom({
 		isFinal: boolean
 		userId?: string
 		speaker?: string
+		startTime?: number
+		endTime?: number
 	}
 
 	const [transcriptions, setTranscriptions] = useState<Transcription[]>([])
 	
+	// Handle incoming transcription messages from WebSocket
+	useEffect(() => {
+		const handleMessage = (event: MessageEvent) => {
+			try {
+				const message = JSON.parse(event.data)
+				if (message.type === 'transcription') {
+					setTranscriptions(prev => [...prev, message.transcription])
+				}
+			} catch (error) {
+				// Ignore non-JSON messages
+			}
+		}
+		
+		if (websocket) {
+			websocket.addEventListener('message', handleMessage)
+			return () => {
+				websocket.removeEventListener('message', handleMessage)
+			}
+		}
+	}, [websocket])
+	
+	// Function to broadcast transcription to all users
+	const broadcastTranscription = useCallback((transcription: Transcription) => {
+		if (websocket) {
+			websocket.send(JSON.stringify({
+				type: 'sendTranscription',
+				transcription: {
+					id: transcription.id,
+					text: transcription.text,
+					timestamp: transcription.timestamp,
+					speaker: transcription.speaker,
+					userId: transcription.userId
+				}
+			}))
+		}
+	}, [websocket])
+	
 	// Initialize speaker tracker for correlating speech with transcriptions
 	const speakerTracker = useSpeakerTracker()
 	
+	// Get actual audio tracks from PullAudioTracks context
+	const pulledAudioTracks = usePulledAudioTracks()
+
 	// Track speaking status for yourself
 	const userIsSpeaking = useIsSpeaking(userMedia.audioStreamTrack)
 	
-	// Track speaking status for other users using pulled audio tracks
-	const otherUsersSpeaking = useMemo(() => {
-		const speakingStatus: Record<string, boolean> = {}
-		
-		otherUsers.forEach(user => {
-			// Get the actual audio track for this user
-			const audioTrackId = user.tracks.audio
-			const audioTrack = audioTrackId ? pulledAudioTracks[audioTrackId] : null
-			
-			// Use the speaking detection hook for remote tracks
-			// Note: We'll need to create individual hooks for each user
-			speakingStatus[user.id] = false // Will be updated by individual useIsSpeaking hooks
-		})
-		
-		return speakingStatus
-	}, [otherUsers, pulledAudioTracks])
-	
-	// Create speaking detection for each remote user
-	const remoteUserSpeakingStates = useMemo(() => {
-		const states: Record<string, boolean> = {}
-		otherUsers.forEach(user => {
-			const audioTrackId = user.tracks.audio
-			const audioTrack = audioTrackId ? pulledAudioTracks[audioTrackId] : null
-			// We'll update this in a separate effect since hooks can't be called conditionally
-		})
-		return states
-	}, [otherUsers, pulledAudioTracks])
+	// Handle speaking detection updates from individual user components
+	const handleSpeakingChange = useCallback((userId: string, userName: string, isSpeaking: boolean) => {
+		speakerTracker.updateSpeakerStatus(userId, userName, isSpeaking)
+		// Temporary debug log to verify speaker tracking is working
+		if (isSpeaking) {
+			console.log('🎤 Speaker started:', userName)
+		}
+	}, [speakerTracker])
 	
 	// Update speaker tracker when speaking status changes
 	useEffect(() => {
 		if (identity?.id && identity?.name) {
 			speakerTracker.updateSpeakerStatus(identity.id, identity.name, userIsSpeaking)
+			// Temporary debug log to verify self speaker tracking is working
+			if (userIsSpeaking) {
+				console.log('🎤 Self started speaking:', identity.name)
+			}
 		}
 	}, [userIsSpeaking, identity?.id, identity?.name, speakerTracker])
 	
-	// Update speaker tracker for other users (placeholder for now)
-	useEffect(() => {
-		otherUsers.forEach(user => {
-			if (user.id && user.name) {
-				const isSpeaking = otherUsersSpeaking[user.id] || false
-				speakerTracker.updateSpeakerStatus(user.id, user.name, isSpeaking)
-			}
-		})
-	}, [otherUsers, otherUsersSpeaking, speakerTracker])
+	// Debug speaker tracker state periodically (disabled to reduce console spam)
+	// useEffect(() => {
+	// 	const interval = setInterval(() => {
+	// 		speakerTracker.debugSpeakerState()
+	// 	}, 5000)
+	// 	return () => clearInterval(interval)
+	// }, [speakerTracker])
+	
 
 	const isTranscriptionHost = useMemo(() => {
 		// Only proceed if we have our own identity
@@ -331,14 +359,13 @@ function JoinedRoom({
 		const hostId = allUsers[0]?.id
 		const isHost = hostId === identity.id
 		
-		// Debug logging to track host selection
-		console.log('🎤 Transcription Host Selection:', {
-			myId: identity.id,
-			allUserIds: allUsers.map(u => u.id),
-			sortedUserIds: allUsers.map(u => u.id),
-			selectedHostId: hostId,
-			amIHost: isHost
-		})
+		// Debug logging to track host selection (commented to reduce console spam)
+		// console.log('🎤 Transcription Host Selection:', {
+		// 	myId: identity.id,
+		// 	allUserIds: allUsers.map(u => u.id),
+		// 	selectedHostId: hostId,
+		// 	amIHost: isHost
+		// })
 		
 		return isHost
 	}, [otherUsers, identity?.id, identity?.name])
@@ -349,9 +376,6 @@ function JoinedRoom({
 			.map((u) => u.tracks.audio!)
 			.filter((track): track is string => track !== undefined)
 	}, [otherUsers, identity])
-
-	// Get actual audio tracks from PullAudioTracks context
-	const pulledAudioTracks = usePulledAudioTracks()
 
 	// Convert track IDs to actual MediaStreamTrack objects and include own microphone
 	const actualAudioTracks = useMemo(() => {
@@ -368,6 +392,7 @@ function JoinedRoom({
 	}, [allRemoteAudioTrackIds, pulledAudioTracks, userMedia.audioStreamTrack])
 
 	const [showTranscription, setShowTranscription] = useState(false)
+	const [showSubtitles, setShowSubtitles] = useState(true)
 	
 	// Track the current transcription host and clear transcriptions when it changes
 	const prevHostId = useRef<string | null>(null)
@@ -378,7 +403,7 @@ function JoinedRoom({
 		
 		// If the host changed, clear transcriptions to start fresh
 		if (prevHostId.current && prevHostId.current !== currentHostId) {
-			console.log('🎤 Transcription host changed from', prevHostId.current, 'to', currentHostId, '- clearing transcriptions')
+			console.log('🎤 Host changed - clearing transcriptions')
 			setTranscriptions([])
 		}
 		
@@ -392,6 +417,77 @@ function JoinedRoom({
 			) as string[],
 		[identity?.name, otherUsers]
 	)
+
+	// Enhanced transcription callback with speaker detection and broadcasting
+	const handleTranscription = useCallback((t: Transcription) => {
+		console.log('🚨 TRANSCRIPTION CALLBACK TRIGGERED:', t)
+		
+		// Enhanced transcription callback with speaker detection
+		const now = Date.now()
+		
+		// Try to get timing from the transcription object if available
+		// Otherwise use a reasonable estimate with a more generous window
+		const transcriptionStart = t.startTime || (now - 5000) // 5 seconds ago as fallback
+		const transcriptionEnd = t.endTime || now
+		
+		console.log('⏰ Timing Debug:', {
+			hasStartTime: Boolean(t.startTime),
+			hasEndTime: Boolean(t.endTime),
+			startTime: t.startTime,
+			endTime: t.endTime,
+			fallbackStart: transcriptionStart,
+			fallbackEnd: transcriptionEnd,
+			duration: transcriptionEnd - transcriptionStart
+		})
+		
+		const primarySpeaker = speakerTracker.getPrimarySpeaker(transcriptionStart, transcriptionEnd)
+		
+		// Debug speaker detection
+		console.log('🔍 Speaker Detection Debug:', {
+			transcriptionTime: `${new Date(transcriptionStart).toLocaleTimeString()} - ${new Date(transcriptionEnd).toLocaleTimeString()}`,
+			primarySpeaker: primarySpeaker,
+			fallbackToHost: !primarySpeaker && isTranscriptionHost,
+			hostName: identity?.name,
+			originalSpeaker: t.speaker
+		})
+		
+		// Fallback: if no speaker detected, try to find any recent speaker
+		let finalSpeaker = primarySpeaker?.userName
+		let finalUserId = primarySpeaker?.userId
+		
+		if (!finalSpeaker) {
+			// Try to get the most recent speaker as a fallback
+			const recentSpeaker = speakerTracker.getMostRecentSpeaker()
+			console.log('🔍 Recent speaker fallback:', recentSpeaker)
+			
+			if (recentSpeaker) {
+				finalSpeaker = recentSpeaker.userName
+				finalUserId = recentSpeaker.userId
+			}
+		}
+		
+		// Final fallback: if still no speaker detected and we're the host, assume it's us
+		if (!finalSpeaker && isTranscriptionHost && identity?.name) {
+			finalSpeaker = identity.name
+			finalUserId = identity.id
+		}
+		
+		// Create enhanced transcription with speaker info
+		const enhancedTranscription: Transcription = {
+			...t,
+			speaker: finalSpeaker || t.speaker || 'Unknown',
+			userId: finalUserId
+		}
+		
+		// Log only the final transcription result
+		console.log('📝 Transcription:', `"${t.text}" - ${finalSpeaker || 'Unknown'}`)
+		
+		// Broadcast transcription to all users
+		broadcastTranscription(enhancedTranscription)
+		
+		// Add to local state for immediate display
+		setTranscriptions((prev) => [...prev, enhancedTranscription])
+	}, [speakerTracker, isTranscriptionHost, identity?.name, identity?.id, broadcastTranscription])
 
 	return (
 		<PullAudioTracks
@@ -460,6 +556,17 @@ function JoinedRoom({
 							</>
 						)}
 					</div>
+					
+					{/* Subtitle Overlay */}
+					{transcriptionEnabled && (
+						<SubtitleOverlay
+							transcriptions={transcriptions}
+							enabled={showSubtitles}
+							maxLines={3}
+							autoHideDelay={8000}
+						/>
+					)}
+					
 					<Toast.Viewport className="absolute bottom-0 right-0" />
 				</div>
 				<div className="flex-shrink-0 flex items-center justify-center gap-2 text-sm p-0 px-2 bg-white pb-[env(safe-area-inset-bottom)] h-[3rem]">
@@ -483,6 +590,18 @@ function JoinedRoom({
 			<HighPacketLossWarningsToast />
 			<IceDisconnectedToast />
 			<ConnectionDiagnostics />
+			{(() => {
+				const currentProvider = getTranscriptionProvider()
+				console.log('🎯 Transcription Setup Debug:', {
+					transcriptionProvider,
+					currentProvider,
+					isTranscriptionHost,
+					transcriptionEnabled,
+					hasOpenAiTranscription,
+					condition: isTranscriptionHost && transcriptionEnabled && (transcriptionProvider === 'openai' || transcriptionProvider === 'openai-realtime') && hasOpenAiTranscription
+				})
+				return null
+			})()}
 			{isTranscriptionHost &&
 			transcriptionEnabled &&
 			(transcriptionProvider === 'openai' || transcriptionProvider === 'openai-realtime') &&
@@ -491,41 +610,27 @@ function JoinedRoom({
 					audioTracks={actualAudioTracks}
 					isActive={isTranscriptionHost}
 					participants={participantNames}
-					onTranscription={(t) => {
-						// Enhanced transcription callback with speaker detection
-						const now = Date.now()
-						const transcriptionStart = now - 2000 // Estimate 2 seconds ago
-						const primarySpeaker = speakerTracker.getPrimarySpeaker(transcriptionStart, now)
-						
-						// Create enhanced transcription with speaker info
-						const enhancedTranscription: Transcription = {
-							...t,
-							speaker: primarySpeaker?.userName || t.speaker || 'Unknown',
-							userId: primarySpeaker?.userId || t.userId
-						}
-						
-						console.log('🎤 Enhanced transcription:', {
-							text: t.text,
-							originalSpeaker: t.speaker,
-							detectedSpeaker: primarySpeaker?.userName,
-							speakerId: primarySpeaker?.userId,
-							speakingDuration: primarySpeaker?.duration
-						})
-						
-						setTranscriptions((prev) => [...prev, enhancedTranscription])
-					}}
+					onTranscription={handleTranscription}
 					provider={getTranscriptionProvider()}
 					speakerTracker={speakerTracker}
 				/>
 			)}
 			{transcriptionEnabled && (
 				<div className="fixed top-4 right-4 z-50 bg-white border border-gray-300 rounded-lg p-4 shadow-lg">
-					<button
-						onClick={() => setShowTranscription((v) => !v)}
-						className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
-					>
-						{showTranscription ? 'Hide' : 'Show'} Transcription
-					</button>
+					<div className="flex flex-col gap-2">
+						<button
+							onClick={() => setShowTranscription((v) => !v)}
+							className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+						>
+							{showTranscription ? 'Hide' : 'Show'} Transcription
+						</button>
+						<button
+							onClick={() => setShowSubtitles((v) => !v)}
+							className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+						>
+							{showSubtitles ? 'Hide' : 'Show'} Subtitles
+						</button>
+					</div>
 					<div className="text-sm text-gray-600 mt-2">
 						Host: {isTranscriptionHost ? 'Yes' : 'No'} | Provider:{' '}
 						{transcriptionProvider} | OpenAI:{' '}
@@ -554,6 +659,23 @@ function JoinedRoom({
 					/>
 				</div>
 			)}
+			
+			{/* Individual speaking detectors for each remote user */}
+			{otherUsers.map(user => {
+				if (!user.id || !user.name || !user.tracks.audio) return null
+				
+				const audioTrack = pulledAudioTracks[user.tracks.audio] || null
+				
+				return (
+					<UserSpeakingDetector
+						key={user.id}
+						userId={user.id}
+						userName={user.name}
+						audioTrack={audioTrack}
+						onSpeakingChange={handleSpeakingChange}
+					/>
+				)
+			})}
 		</PullAudioTracks>
 	)
 }

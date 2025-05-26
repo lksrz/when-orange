@@ -8,6 +8,7 @@ interface TranscriptionServiceOptions {
   speakerTracker?: {
     getPrimarySpeaker: (startTime: number, endTime: number) => { userId: string; userName: string; duration: number } | null
   }
+  onTranscriptionWithSpeaker?: (text: string, startTime?: number, endTime?: number) => void
 }
 
 interface TranscriptionResult {
@@ -79,7 +80,7 @@ export function useTranscriptionServiceFactory(
   tracks: MediaStreamTrack[] = [],
   options: TranscriptionServiceOptions = { enabled: false, provider: 'openai' }
 ): TranscriptionResult {
-  const { enabled, provider = 'openai', speakerTracker } = options
+  const { enabled, provider = 'openai', speakerTracker, onTranscriptionWithSpeaker } = options
   
   // Use the adapter for the Whisper API to match the unified interface
   const whisperResult = useWhisperAdapter(tracks, enabled && provider === 'openai')
@@ -87,7 +88,8 @@ export function useTranscriptionServiceFactory(
   // The Realtime API hook already matches our interface
   const realtimeResult = useRealtimeTranscriptionService(tracks, {
     enabled: enabled && provider === 'openai-realtime',
-    transcriptionProvider: 'openai-realtime'
+    transcriptionProvider: 'openai-realtime',
+    onTranscriptionWithSpeaker: onTranscriptionWithSpeaker
   })
   
   // Use useMemo to select the appropriate result based on provider

@@ -7,6 +7,9 @@ export type Transcription = {
 	timestamp: number
 	isFinal: boolean
 	speaker: string
+	startTime?: number
+	endTime?: number
+	userId?: string
 }
 
 // Configuration

@@ -548,6 +548,15 @@ export class ChatRoom extends Server<Env> {
 					this.broadcastRoomState()
 					break
 				}
+				case 'sendTranscription': {
+					// Broadcast transcription to all room participants
+					const transcriptionMessage: ServerMessage = {
+						type: 'transcription',
+						transcription: data.transcription
+					}
+					this.broadcastMessage(transcriptionMessage)
+					break
+				}
 				default: {
 					assertNever(data)
 					break

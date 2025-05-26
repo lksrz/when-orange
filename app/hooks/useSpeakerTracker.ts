@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 
 interface SpeakerActivity {
   userId: string
@@ -69,12 +69,24 @@ export function useSpeakerTracker() {
   
   // Get the primary speaker during a time range (for transcription correlation)
   const getPrimarySpeaker = useCallback((startTime: number, endTime: number): SpeakerInfo | null => {
+    console.log('🔍 Speaker Tracker Debug:', {
+      requestedTimeRange: `${new Date(startTime).toLocaleTimeString()} - ${new Date(endTime).toLocaleTimeString()}`,
+      totalActivities: speakerActivities.current.length,
+      recentActivities: speakerActivities.current.slice(-3).map(a => ({
+        user: a.userName,
+        time: `${new Date(a.startTime).toLocaleTimeString()} - ${a.endTime ? new Date(a.endTime).toLocaleTimeString() : 'ongoing'}`,
+        active: a.isActive
+      }))
+    })
+    
     const relevantActivities = speakerActivities.current.filter(activity => {
       const activityStart = activity.startTime
       const activityEnd = activity.endTime || Date.now()
       
       // Check if activity overlaps with the time range
-      return activityStart <= endTime && activityEnd >= startTime
+      const overlaps = activityStart <= endTime && activityEnd >= startTime
+      
+      return overlaps
     })
     
     if (relevantActivities.length === 0) {
@@ -119,6 +131,27 @@ export function useSpeakerTracker() {
     return Array.from(activeSpeakers)
   }, [activeSpeakers])
   
+  // Get the most recent speaker (for fallback when timing correlation fails)
+  const getMostRecentSpeaker = useCallback((): SpeakerInfo | null => {
+    if (speakerActivities.current.length === 0) {
+      return null
+    }
+    
+    // Get the most recent activity
+    const recentActivity = speakerActivities.current
+      .sort((a, b) => b.startTime - a.startTime)[0]
+    
+    if (!recentActivity) {
+      return null
+    }
+    
+    return {
+      userId: recentActivity.userId,
+      userName: recentActivity.userName,
+      duration: (recentActivity.endTime || Date.now()) - recentActivity.startTime
+    }
+  }, [])
+  
   // Debug function to log current state
   const debugSpeakerState = useCallback(() => {
     console.log('🎤 Speaker Tracker State:', {
@@ -132,6 +165,7 @@ export function useSpeakerTracker() {
     updateSpeakerStatus,
     getPrimarySpeaker,
     getCurrentActiveSpeakers,
+    getMostRecentSpeaker,
     activeSpeakers: Array.from(activeSpeakers),
     debugSpeakerState
   }

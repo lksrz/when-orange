@@ -59,7 +59,8 @@ export default function useRoom({
 				case 'e2eeMlsMessage':
 				case 'userLeftNotification':
 				case 'aiSdp':
-					// do nothing
+				case 'transcription':
+					// do nothing - transcription is handled in the room component
 					break
 				default:
 					message satisfies never
