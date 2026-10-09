@@ -9,6 +9,10 @@ import { createRequestHandler } from '@remix-run/cloudflare'
 import * as build from '@remix-run/dev/server-build'
 // @ts-expect-error
 import manifestJSON from '__STATIC_CONTENT_MANIFEST'
+import {
+	costKillSwitchResponse,
+	isCostKillSwitchOn,
+} from '~/utils/costGuard.server'
 import { mode } from '~/utils/mode'
 import { queue } from './app/queue'
 
@@ -103,6 +107,7 @@ const kvAssetHandler = createKvAssetHandler(JSON.parse(manifestJSON))
 
 export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext) {
+		if (isCostKillSwitchOn(env)) return costKillSwitchResponse()
 		const assetResponse = await kvAssetHandler(request, env, ctx, build)
 		if (assetResponse) return assetResponse
 		return remixHandler(request, { env, mode })

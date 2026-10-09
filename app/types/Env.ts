@@ -29,4 +29,5 @@ export type Env = {
 	TRANSCRIPTION_ENABLED?: string
 	AI_INVITE_ENABLED?: string
 	AUTH_SECRET?: string
+	COST_KILL_SWITCH?: string
 }

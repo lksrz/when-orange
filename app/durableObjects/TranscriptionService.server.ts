@@ -1,4 +1,10 @@
 import type { Env } from '~/types/Env'
+import {
+	costBreakerResponse,
+	costKillSwitchResponse,
+	isCostKillSwitchOn,
+	RunawayBreaker,
+} from '~/utils/costGuard.server'
 
 /**
  * TranscriptionService Durable Object
@@ -29,6 +35,11 @@ interface PendingResponse {
 	timestamp: number
 }
 
+// Cost-guard breaker limits per object per minute. Legit peak: audio chunks
+// capped by MAX_MESSAGE_RATE (60/s => 3.6k/min) plus a few control requests;
+// Deepgram results (interim + final) arrive at ~10/s => ~600/min.
+const breakerLimits = { fetch: 100_000, deepgram: 20_000 }
+
 export class TranscriptionService {
 	state: DurableObjectState
 	env: Env
@@ -42,6 +53,8 @@ export class TranscriptionService {
 
 	// Keep track of pending responses to API requests
 	pendingResponses: Map<string, PendingResponse> = new Map()
+
+	breaker = new RunawayBreaker('TranscriptionService', breakerLimits)
 
 	// Timeouts and intervals
 	deepgramKeepaliveInterval: number | null = null
@@ -57,6 +70,10 @@ export class TranscriptionService {
 	constructor(state: DurableObjectState, env: Env) {
 		this.state = state
 		this.env = env
+
+		// Skip all storage work while the cost kill switch is on; fetch rejects
+		// every request anyway.
+		if (isCostKillSwitchOn(env)) return
 
 		// Start state persistence
 		this.state.blockConcurrencyWhile(async () => {
@@ -74,6 +91,8 @@ export class TranscriptionService {
 
 	// Main fetch handler for the DO
 	async fetch(request: Request): Promise<Response> {
+		if (isCostKillSwitchOn(this.env)) return costKillSwitchResponse()
+		if (!this.breaker.allow('fetch')) return costBreakerResponse()
 		const url = new URL(request.url)
 
 		// Create a unique request ID for tracing
@@ -619,6 +638,14 @@ export class TranscriptionService {
 
 				// Handle messages from Deepgram
 				socket.addEventListener('message', (event) => {
+					if (isCostKillSwitchOn(this.env)) {
+						socket.close(1013, 'cost guard')
+						return
+					}
+					if (!this.breaker.allow('deepgram')) {
+						socket.close(1008, 'cost guard')
+						return
+					}
 					this.handleDeepgramMessage(event.data);
 					this.resetInactivityTimeout();
 				});

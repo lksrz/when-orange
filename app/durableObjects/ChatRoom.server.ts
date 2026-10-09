@@ -15,6 +15,13 @@ import {
 } from 'partyserver'
 import { getDb, Meetings } from 'schema'
 import invariant from 'tiny-invariant'
+import {
+	COST_GUARD_MESSAGE,
+	costBreakerResponse,
+	costKillSwitchResponse,
+	isCostKillSwitchOn,
+	RunawayBreaker,
+} from '~/utils/costGuard.server'
 import { log } from '~/utils/logging'
 import {
 	CallsNewSession,
@@ -25,6 +32,19 @@ import {
 } from '~/utils/openai.server'
 
 const alarmInterval = 15_000
+// Cost-guard breaker limits per room per minute. Legit peak: ~20 users sending
+// heartbeats/track updates (~2 msg/s each => ~2.4k msgs/min), a handful of
+// (re)connects, 4 alarms/min (15s interval) and a few internal method calls per
+// message/connect (`rpc`, ~10k/min). Every limit is >=20x that peak.
+const breakerLimits = {
+	fetch: 2_000,
+	message: 50_000,
+	alarm: 80,
+	rpc: 200_000,
+}
+const maxAlarmRearmsPerMinute = 80
+// Delay used when the breaker or re-arm cap trips, so the alarm chain recovers.
+const alarmRecoveryDelay = 5 * 60 * 1000
 const defaultOpenAIModelID = 'gpt-4o-realtime-preview-2024-10-01'
 
 /**
@@ -38,6 +58,10 @@ const defaultOpenAIModelID = 'gpt-4o-realtime-preview-2024-10-01'
 export class ChatRoom extends Server<Env> {
 	env: Env
 	db: DrizzleD1Database<Record<string, never>> | null
+	breaker = new RunawayBreaker('ChatRoom', breakerLimits)
+	alarmRearms = new RunawayBreaker('ChatRoom alarm re-arm', {
+		rearm: maxAlarmRearmsPerMinute,
+	})
 
 	// static options = { hibernate: true }
 
@@ -47,12 +71,51 @@ export class ChatRoom extends Server<Env> {
 		this.db = getDb(this)
 	}
 
+	async fetch(request: Request): Promise<Response> {
+		if (isCostKillSwitchOn(this.env)) return costKillSwitchResponse()
+		if (!this.breaker.allow('fetch')) return costBreakerResponse()
+		return super.fetch(request)
+	}
+
+	// Public methods are reachable over Durable Object RPC (bypassing fetch), so
+	// every method that does storage/database work runs this guard first. It
+	// also counts internal calls, which the `rpc` limit accounts for.
+	private guardRpc() {
+		if (isCostKillSwitchOn(this.env)) throw new Error(COST_GUARD_MESSAGE)
+		if (!this.breaker.allow('rpc')) {
+			throw new Error('rate limited by cost guard')
+		}
+	}
+
+	// Non-throwing variant for broadcast helpers that are often called
+	// fire-and-forget: when guarded they quietly do nothing instead of producing
+	// unhandled promise rejections.
+	private guardSoft(): boolean {
+		if (isCostKillSwitchOn(this.env)) return false
+		return this.breaker.allow('rpc')
+	}
+
+	async setName(name: string): Promise<void> {
+		this.guardRpc()
+		return super.setName(name)
+	}
+
+	// Inherited from partyserver and RPC-callable, so guard it like the rest.
+	broadcast(
+		msg: string | ArrayBuffer | ArrayBufferView,
+		without?: string[] | undefined
+	): void {
+		this.guardRpc()
+		super.broadcast(msg, without)
+	}
+
 	// a small typesafe wrapper around connection.send
 	sendMessage<M extends ServerMessage>(connection: Connection, message: M) {
 		connection.send(JSON.stringify(message))
 	}
 
 	async onStart(): Promise<void> {
+		this.guardRpc()
 		const meetingId = await this.getMeetingId()
 		log({ eventName: 'onStart', meetingId })
 		this.db = getDb(this)
@@ -69,6 +132,7 @@ export class ChatRoom extends Server<Env> {
 		connection: Connection<User>,
 		ctx: ConnectionContext
 	): Promise<void> {
+		this.guardRpc()
 		// let's start the periodic alarm if it's not already started
 		if (!(await this.ctx.storage.getAlarm())) {
 			// start the alarm to broadcast state every 30 seconds
@@ -114,6 +178,7 @@ export class ChatRoom extends Server<Env> {
 	}
 
 	async trackPeakUserCount() {
+		this.guardRpc()
 		let meetingId = await this.getMeetingId()
 		const meeting = meetingId
 			? await this.getMeeting(meetingId)
@@ -143,10 +208,12 @@ export class ChatRoom extends Server<Env> {
 	}
 
 	async getMeetingId() {
+		this.guardRpc()
 		return this.ctx.storage.get<string>('meetingId')
 	}
 
 	async createMeeting() {
+		this.guardRpc()
 		const meetingId = crypto.randomUUID()
 		await this.ctx.storage.put('meetingId', meetingId)
 		log({ eventName: 'startingMeeting', meetingId })
@@ -163,6 +230,7 @@ export class ChatRoom extends Server<Env> {
 	}
 
 	async getMeeting(meetingId: string) {
+		this.guardRpc()
 		if (!this.db) return null
 		const [meeting] = await this.db
 			.select()
@@ -172,10 +240,25 @@ export class ChatRoom extends Server<Env> {
 		return meeting
 	}
 
+	// Broadcast helpers are frequently called fire-and-forget, so they never
+	// reject: guard failures (kill switch / `rpc` breaker) and send errors are
+	// logged instead of surfacing as unhandled promise rejections.
 	async broadcastMessage(
 		message: ServerMessage,
 		excludedConnection?: Connection
+	): Promise<void> {
+		try {
+			await this.broadcastMessageUnsafe(message, excludedConnection)
+		} catch (error) {
+			console.warn('ChatRoom broadcastMessage failed', error)
+		}
+	}
+
+	private async broadcastMessageUnsafe(
+		message: ServerMessage,
+		excludedConnection?: Connection
 	) {
+		if (!this.guardSoft()) return
 		let didSomeoneQuit = false
 		const meetingId = await this.getMeetingId()
 		const messageAsString = JSON.stringify(message)
@@ -202,7 +285,16 @@ export class ChatRoom extends Server<Env> {
 		}
 	}
 
-	async broadcastRoomState() {
+	async broadcastRoomState(): Promise<void> {
+		try {
+			await this.broadcastRoomStateUnsafe()
+		} catch (error) {
+			console.warn('ChatRoom broadcastRoomState failed', error)
+		}
+	}
+
+	private async broadcastRoomStateUnsafe() {
+		if (!this.guardSoft()) return
 		const meetingId = await this.getMeetingId()
 		const aiEnabled =
 			(await this.ctx.storage.get<boolean>('ai:enabled')) ?? false
@@ -256,6 +348,8 @@ export class ChatRoom extends Server<Env> {
 		reason: string,
 		wasClean: boolean
 	) {
+		// Sockets closed by the kill switch land here; skip all storage work.
+		if (isCostKillSwitchOn(this.env)) return
 		const meetingId = await this.getMeetingId()
 		log({
 			eventName: 'onClose',
@@ -271,6 +365,14 @@ export class ChatRoom extends Server<Env> {
 		connection: Connection<User>,
 		message: WSMessage
 	): Promise<void> {
+		if (isCostKillSwitchOn(this.env)) {
+			connection.close(1013, 'cost guard')
+			return
+		}
+		if (!this.breaker.allow('message')) {
+			connection.close(1008, 'cost guard')
+			return
+		}
 		try {
 			const meetingId = await this.getMeetingId()
 			if (typeof message !== 'string') {
@@ -582,6 +684,7 @@ export class ChatRoom extends Server<Env> {
 	}
 
 	onError(connection: Connection, error: unknown): void | Promise<void> {
+		if (isCostKillSwitchOn(this.env)) return
 		log({
 			eventName: 'onErrorHandler',
 			error,
@@ -598,12 +701,14 @@ export class ChatRoom extends Server<Env> {
 	}
 
 	getUsers() {
+		this.guardRpc()
 		return this.ctx.storage.list<User>({
 			prefix: 'session-',
 		})
 	}
 
 	async endMeeting(meetingId: string) {
+		this.guardRpc()
 		log({ eventName: 'endingMeeting', meetingId })
 		if (this.db) {
 			// stamp meeting as ended
@@ -618,13 +723,17 @@ export class ChatRoom extends Server<Env> {
 	}
 
 	userLeftNotification(id: string) {
+		if (!this.guardSoft()) return
 		this.broadcastMessage({
 			type: 'userLeftNotification',
 			id,
-		})
+		}).catch((error) =>
+			console.warn('ChatRoom userLeftNotification failed', error)
+		)
 	}
 
 	async cleanupDuplicateUser(username: string, newConnectionId: string) {
+		this.guardRpc()
 		const meetingId = await this.getMeetingId()
 		const users = await this.getUsers()
 
@@ -678,6 +787,7 @@ export class ChatRoom extends Server<Env> {
 	}
 
 	async cleanupOldConnections() {
+		this.guardRpc()
 		const meetingId = await this.getMeetingId()
 		if (!meetingId) log({ eventName: 'meetingIdNotFoundInCleanup' })
 		const now = Date.now()
@@ -710,21 +820,49 @@ export class ChatRoom extends Server<Env> {
 		const activeUserCount = (await this.getUsers()).size
 
 		if (meetingId && activeUserCount === 0) {
-			this.endMeeting(meetingId)
+			this.endMeeting(meetingId).catch((error) =>
+				console.warn('ChatRoom endMeeting failed during cleanup', error)
+			)
 		} else if (removedUsers > 0) {
-			this.broadcastRoomState()
+			this.broadcastRoomState().catch((error) =>
+				console.warn('ChatRoom broadcast failed during cleanup', error)
+			)
 		}
 
 		return activeUserCount
 	}
 
 	async alarm(): Promise<void> {
-		const meetingId = await this.getMeetingId()
-		log({ eventName: 'alarm', meetingId })
-		const activeUserCount = await this.cleanupOldConnections()
-		await this.broadcastRoomState()
+		if (isCostKillSwitchOn(this.env)) {
+			await this.ctx.storage.deleteAlarm()
+			return
+		}
+		if (!this.breaker.allow('alarm')) {
+			// Skip the work but keep a slow recovery alarm so periodic cleanup
+			// resumes once the breaker window has passed.
+			this.ctx.storage.setAlarm(Date.now() + alarmRecoveryDelay)
+			return
+		}
+		let activeUserCount: number
+		try {
+			const meetingId = await this.getMeetingId()
+			log({ eventName: 'alarm', meetingId })
+			activeUserCount = await this.cleanupOldConnections()
+			await this.broadcastRoomState()
+		} catch (error) {
+			// e.g. the `rpc` breaker tripped inside a guarded method: keep the
+			// chain alive with a recovery alarm instead of throwing.
+			console.warn('ChatRoom alarm failed; scheduling recovery alarm', error)
+			this.ctx.storage.setAlarm(Date.now() + alarmRecoveryDelay)
+			return
+		}
 		if (activeUserCount !== 0) {
-			this.ctx.storage.setAlarm(Date.now() + alarmInterval)
+			// Normal cadence while under the re-arm cap; past it, fall back to a
+			// slow recovery alarm instead of stopping cleanup altogether.
+			const delay = this.alarmRearms.allow('rearm')
+				? alarmInterval
+				: alarmRecoveryDelay
+			this.ctx.storage.setAlarm(Date.now() + delay)
 		}
 	}
 }

@@ -33,6 +33,11 @@ The following variables are optional:
 
 To customise these variables, place replacement values in `.dev.vars` (for development) and in the `[vars]` section of `wrangler.toml` (for the deployment).
 
+### Cost guards
+
+- `COST_KILL_SWITCH` (secret, set by the central cost guard on budget breach): when `"1"`, the Worker returns `503 {"error":"temporarily disabled by cost guard"}` with `Retry-After: 3600` before touching any binding, the queue handler calls `batch.retryAll({ delaySeconds: 300 })` so queued feedback cards are redelivered later instead of being acknowledged (they are dropped only once the queue's max retries are exhausted while the switch stays on), and the `ChatRoom` / `TranscriptionService` Durable Objects reject fetches (503), close WebSocket senders' sockets (1013; for `TranscriptionService` also the upstream Deepgram socket on its next message), make `ChatRoom` RPC-callable methods (`createMeeting`, `endMeeting`, `setName`, ...) throw, skip `TranscriptionService` storage initialization, and `ChatRoom` deletes its alarm without rescheduling. Clear with `wrangler secret delete COST_KILL_SWITCH` (or set it to `0`).
+- Runaway breaker (`app/utils/costGuard.server.ts`): each Durable Object instance counts its ops in memory per fixed 60s window. Limits per minute (each >=20x the legitimate peak): `ChatRoom` 2,000 fetches/connects, 50,000 WebSocket messages, 200,000 guarded method calls (RPC + internal), 80 alarms, max 80 alarm re-arms; `TranscriptionService` 100,000 fetches, 20,000 Deepgram messages. Above a limit fetches get 429, WebSocket senders (and the Deepgram socket) are closed with 1008, guarded `ChatRoom` methods (including the inherited `broadcast`) throw, while the fire-and-forget broadcast helpers (`broadcastMessage`, `broadcastRoomState`, `userLeftNotification`) silently skip, and alarm work is skipped, with `ChatRoom` falling back to a 5-minute recovery alarm (also used once the re-arm cap is hit) so periodic cleanup resumes; one `console.warn` per window.
+
 ## Development
 
 ```sh
