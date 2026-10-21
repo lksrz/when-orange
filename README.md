@@ -155,3 +155,7 @@ Please ensure all tests pass and TypeScript compiles without errors:
 ```bash
 npm run check
 ```
+
+## Cloudflare preview URLs
+
+`wrangler.toml` and `wrangler.production.toml` set `preview_urls = false` for their respective Workers, so future deploys keep version and preview URLs disabled. Existing call routes and `workers.dev` settings are unchanged.

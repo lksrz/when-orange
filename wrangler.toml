@@ -1,4 +1,5 @@
 name = "whenmeet-call"
+preview_urls = false
 account_id = "9e7cfb40f9896e268a8212dc58e20780"
 # https://developers.cloudflare.com/workers/platform/compatibility-dates
 compatibility_date = "2024-10-07"

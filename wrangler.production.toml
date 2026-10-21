@@ -1,4 +1,5 @@
 name = "whenmeet-call-production"
+preview_urls = false
 
 account_id = "9e7cfb40f9896e268a8212dc58e20780"
 main = "./build/index.js"
