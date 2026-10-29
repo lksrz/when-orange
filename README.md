@@ -54,6 +54,12 @@ Open up [http://127.0.0.1:8787](http://127.0.0.1:8787) and you should be ready t
 
 ## Deployment
 
+This legacy `whenmeet-call` Worker is dormant. `wrangler.toml` keeps
+`routes = []`, `workers_dev = false`, and `preview_urls = false`, so a standard
+deploy updates the existing Worker without restoring `call.whenmeet.me`.
+Transcription is disabled by default. Reopening a public route requires a
+separate deployment decision.
+
 1. Make sure you've installed `wrangler` and are logged in by running:
 
 ```sh

@@ -4,7 +4,8 @@ The standard Whisper client used to request the server's OpenAI API key from
 `POST /api/transcription-token`. That endpoint is retired and returns HTTP 410
 without a credential. The legacy `openai` provider cannot transcribe audio.
 
-The Worker configuration sets `TRANSCRIPTION_ENABLED = "false"` by default.
+The Worker configuration sets `TRANSCRIPTION_ENABLED = "false"` by default
+and explicitly leaves routes, `workers.dev`, and preview URLs disabled.
 The room loader passes this flag to the UI, which does not mount the
 transcription service while it is disabled. This is a source-level safeguard
 for a dormant Worker; it does not publish any Worker route or domain.
