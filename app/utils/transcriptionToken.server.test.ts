@@ -11,10 +11,7 @@ const requestAction = (url: string, env: Record<string, unknown>) =>
 
 describe('transcription token endpoint', () => {
 	it('keeps the dormant Worker transcription default disabled', () => {
-		const config = readFileSync(
-			new URL('../../wrangler.toml', import.meta.url),
-			'utf8'
-		)
+		const config = readFileSync('wrangler.toml', 'utf8')
 		expect(config).toMatch(/^TRANSCRIPTION_ENABLED = "false"$/m)
 	})
 
