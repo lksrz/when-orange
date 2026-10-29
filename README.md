@@ -40,6 +40,11 @@ To customise these variables, place replacement values in `.dev.vars` (for devel
 
 ## Development
 
+The legacy standard transcription token endpoint (`POST /api/transcription-token`)
+returns HTTP 410 and never exposes the server's OpenAI credential. The
+realtime transcription path remains separate. Transcription is disabled in the
+default Worker configuration (`TRANSCRIPTION_ENABLED = "false"`).
+
 ```sh
 npm install
 npm run dev
