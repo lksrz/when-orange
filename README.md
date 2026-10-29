@@ -1,3 +1,9 @@
+# Archived — 2026-10-29
+
+This repository is retired and the service is not in use. The code and data
+are retained; the documentation below is historical. Do not restore public
+routing or deploy the Worker again without a new decision to reactivate it.
+
 # Welcome to Orange Meets
 
 Orange Meets is a demo application built using [Cloudflare Calls](https://developers.cloudflare.com/calls/). To build your own WebRTC application using Cloudflare Calls, get started in the [Cloudflare Dashboard](https://dash.cloudflare.com/?to=/:account/calls).
